@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 - 三种节点：VLESS + REALITY + Vision、Hysteria2、VLESS + WebSocket + TLS。
 - 同一用户可以使用多个节点，每个节点分别设置使用权限和连接密钥。
-- 出口类型可扩展，目前提供 SOCKS5 出口。
+- 出口支持 HTTP、SOCKS5、Shadowsocks（SS），输入分享链接自动解析；暂不支持其他出口协议或 SS 插件。
 - 每个用户在每个节点上可保存多个出口，并选择其中一个使用，或选择直连（DIRECT，不经过代理出口）。
 - 不支持 UDP 的代理出口会阻止 UDP 流量，不会偷偷改用 VPS 直连。
 - 由 sing-box 通过 ACME 申请和续期证书，管理器提供检查功能。

@@ -1,10 +1,10 @@
-from sbmanager.egress.drivers import socks5
+from sbmanager.egress.drivers import http, shadowsocks, socks5
 from sbmanager.security import ValidationError
 
-DRIVERS = {'socks5': socks5}
+DRIVERS = {'http': http, 'socks5': socks5, 'ss': shadowsocks}
 
 
 def driver(protocol):
     if protocol not in DRIVERS:
-        raise ValidationError('出口协议不支持，目前只能添加 SOCKS5（socks5）出口')
+        raise ValidationError('出口协议不支持，目前仅支持 HTTP、SOCKS5、SS')
     return DRIVERS[protocol]

@@ -11,6 +11,7 @@ from sbmanager.modules.export_manager import export_user
 from sbmanager.modules.certificate_manager import inspect
 from sbmanager.core.transaction_manager import atomic_write, encode
 from sbmanager.egress.registry import driver
+from sbmanager.egress.links import parse_link
 
 
 STYLES = {
@@ -25,7 +26,7 @@ MENUS = (
     ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点')),
     ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '开通节点', '启用或停用',
                   '取消节点权限', '重置连接密钥', '删除用户')),
-    ('出口管理', ('查看出口', '添加 SOCKS5', '切换用户出口', '测试连接', '修改出口',
+    ('出口管理', ('查看出口', '添加出口', '切换用户出口', '测试连接', '修改出口',
                   '移除已保存的出口', '删除出口')),
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
                   '更新管理程序', '卸载全部')),
@@ -196,6 +197,7 @@ def show_records(manager, kind):
                 print(f'  节点：{state["inbounds"][iid]["name"]} · 出口：{egress}')
         else:
             settings = record['settings']
+            print('  协议：' + record['protocol'].upper())
             print(f'  服务器：{settings["server"]}:{settings["port"]}')
             print('  UDP：' + ('声明支持，未验证' if settings['udp'] else '已阻止'))
 
@@ -290,18 +292,23 @@ def user_action(action, manager):
             message('用户已删除')
 
 
-def socks_settings():
-    return {'server': ask('SOCKS5 服务器 IP 或域名'), 'port': int(ask('端口')),
-            'username': ask('用户名'), 'password': getpass.getpass('密码（输入隐藏）\n> '),
-            'udp': ask('支持 UDP？（yes 支持，回车阻止）') == 'yes'}
+def edit_egress(manager, profile=None):
+    link = getpass.getpass('节点分享链接（支持 http、socks5、ss；输入隐藏；0 取消）\n> ').strip()
+    if link == '0':
+        raise Cancelled
+    protocol, settings, link_name = parse_link(link)
+    default = link_name or (profile['name'] if profile else protocol.upper())
+    name = ask(f'出口名称（回车使用 {default}）') or default
+    if protocol != 'http':
+        settings['udp'] = ask('支持 UDP？（yes 支持，回车阻止）') == 'yes'
+    manager.save_egress(name, protocol, settings, profile['id'] if profile else None)
 
 
 def egress_action(action, manager):
     if action == 1:
         show_records(manager, 'egress')
     elif action == 2:
-        name = ask('出口名称')
-        manager.save_egress(name, 'socks5', socks_settings())
+        edit_egress(manager)
         message('出口已添加')
     elif action in (3, 6):
         uid, iid = user_node(manager)
@@ -327,8 +334,7 @@ def egress_action(action, manager):
             result = driver(profile['protocol']).test_connection(profile)
             message(result['note'], tone='warning')
         elif action == 5:
-            name = ask('出口名称')
-            manager.save_egress(name, profile['protocol'], socks_settings(), eid)
+            edit_egress(manager, profile)
             message('出口已保存')
         elif confirm('删除出口后无法直接撤销。'):
             manager.delete_egress(eid)

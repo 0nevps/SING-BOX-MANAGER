@@ -223,9 +223,11 @@ class CliWordingTests(unittest.TestCase):
         self.assertEqual({}, self.store.read()['users'])
 
     def test_egress_creation_edit_test_and_deletion(self):
-        with patch('sbmanager.cli.getpass.getpass', return_value='hidden'):
-            self.run_menu(['3', '2', 'proxy', 'proxy.example.com', '1080', 'user', '', '0', '0'])
-            self.run_menu(['3', '5', '1', 'updated', 'other.example.com', '1081', 'user', 'yes', '0', '0'])
+        with patch('sbmanager.cli.getpass.getpass', side_effect=[
+                'socks5://user:hidden@proxy.example.com:1080',
+                'socks5://user:hidden@other.example.com:1081']):
+            self.run_menu(['3', '2', 'proxy', '', '0', '0'])
+            self.run_menu(['3', '5', '1', 'updated', 'yes', '0', '0'])
         profile = next(iter(self.store.read()['egress'].values()))
         self.assertEqual('updated', profile['name'])
         self.assertEqual('other.example.com', profile['settings']['server'])
