@@ -6,5 +6,5 @@ DRIVERS = {'socks5': socks5}
 
 def driver(protocol):
     if protocol not in DRIVERS:
-        raise ValidationError('不支持的出口协议')
+        raise ValidationError('出口协议不支持，目前只能添加 SOCKS5（socks5）出口')
     return DRIVERS[protocol]

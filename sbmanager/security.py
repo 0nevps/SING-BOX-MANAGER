@@ -9,7 +9,7 @@ class ValidationError(ValueError):
 
 def text(value, label):
     if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 for c in value):
-        raise ValidationError(f'{label}不能为空或包含控制字符')
+        raise ValidationError(f'{label}不能为空，也不能包含换行、制表符等控制字符。请重新输入')
     return value.strip()
 
 

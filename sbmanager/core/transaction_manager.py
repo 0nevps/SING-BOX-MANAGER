@@ -12,7 +12,7 @@ from sbmanager.security import ValidationError
 def atomic_write(path, content):
     path = Path(path)
     if path.is_symlink():
-        raise ValidationError('拒绝写入符号链接')
+        raise ValidationError('目标文件是符号链接（指向其他文件的链接）。为避免覆盖其他文件，已停止写入')
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd, name = tempfile.mkstemp(prefix='.pending-', dir=path.parent)
     try:
@@ -94,26 +94,26 @@ class Deployment:
                 try:
                     self.recover()
                 except Exception as recovery:
-                    raise ValidationError('应用和恢复均失败；恢复日志已保留，停止修改并检查服务') from recovery
-                raise ValidationError('应用失败，已恢复原状态、配置及服务状态') from failure
+                    raise ValidationError('新配置未能生效，恢复原配置也失败。恢复记录 transaction.json 已保留；请停止修改，检查服务日志、磁盘空间和文件权限，不要删除恢复记录') from recovery
+                raise ValidationError('本次修改未能生效，已恢复修改前的数据、配置和服务状态。请检查节点、出口设置及服务日志后重试') from failure
             self.prune(state.get("backup_keep", 20))
         finally:
             candidate.unlink(missing_ok=True)
 
     def restore(self, name):
         if Path(name).name != name or not name.endswith('.json'):
-            raise ValidationError('无效备份名称')
+            raise ValidationError('备份文件名不正确。请从菜单 22 复制完整的 .json 文件名，不要填写目录路径')
         snapshot = json.loads((self.backups / name).read_text())
         if snapshot['state'] is None:
-            raise ValidationError('备份没有业务状态')
+            raise ValidationError('这份备份没有保存用户、节点等数据，无法恢复。请选择其他备份')
         state = json.loads(snapshot['state'])
         if state.get('schema_version') != 1:
-            raise ValidationError('备份 schema 不受支持')
+            raise ValidationError('这份备份的数据格式版本不兼容。请使用匹配的程序版本或选择其他备份')
         self.apply(state)
 
     def prune(self, keep):
         if type(keep) is not int or keep < 1:
-            raise ValidationError('至少保留一份备份')
+            raise ValidationError('至少要保留 1 份备份，请输入不小于 1 的整数')
         files = sorted(self.backups.glob('*.json'), reverse=True)
         for path in files[keep:]:
             path.unlink()

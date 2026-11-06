@@ -19,7 +19,7 @@ class StateStore:
     def __init__(self, directory):
         self.directory = Path(directory).expanduser()
         if self.directory.is_symlink():
-            raise ValidationError('状态目录不能是符号链接')
+            raise ValidationError('数据目录不能使用符号链接（指向其他位置的链接），请指定实际目录')
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.directory.chmod(0o700)
         self.path = self.directory / 'state.json'
@@ -37,17 +37,17 @@ class StateStore:
 
     def _read(self):
         if self.path.is_symlink():
-            raise ValidationError('状态文件不能是符号链接')
+            raise ValidationError('数据文件 state.json 不能使用符号链接（指向其他文件的链接）。为避免写错位置，已停止操作')
         if not self.path.exists():
             return empty_state()
         self.path.chmod(0o600)
         with self.path.open(encoding='utf-8') as stream:
             state = json.load(stream)
         if not isinstance(state, dict) or state.get('schema_version') != 1:
-            raise ValidationError('不支持的状态 schema 版本')
+            raise ValidationError('保存的数据格式版本不兼容。请使用匹配的程序版本，不要手动修改 state.json')
         for key in ('users', 'inbounds', 'egress', 'bindings'):
             if not isinstance(state.get(key), dict):
-                raise ValidationError(f'状态字段损坏: {key}')
+                raise ValidationError(f'数据文件中的 {key} 字段损坏。请保留原文件，使用有效备份恢复，不要手动删除数据')
         validate_state(state)
         return state
 

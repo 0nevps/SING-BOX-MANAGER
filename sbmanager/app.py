@@ -11,14 +11,14 @@ from sbmanager.cli import run
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Sing-Box Manager 业务基础预览（不应用服务配置）')
-    parser.add_argument('--state-dir', type=Path, default=Path.home() / '.local/state/sbmanager-dev', help='业务预览状态目录，包含敏感数据')
-    parser.add_argument('--system', action='store_true', help='Linux root 系统服务模式')
-    parser.add_argument('--sing-box', default='sing-box', help='sing-box 二进制路径')
+    parser = argparse.ArgumentParser(description='Sing-Box Manager：管理节点、用户和出口；默认只在本地保存设置，不操作系统服务')
+    parser.add_argument('--state-dir', type=Path, default=Path.home() / '.local/state/sbmanager-dev', help='本地模式保存设置的目录，含连接密钥，请勿公开')
+    parser.add_argument('--system', action='store_true', help='管理 Linux 系统服务，需要 root 权限；安装后使用 sudo sbmanager 即可')
+    parser.add_argument('--sing-box', default='sing-box', help='sing-box 程序的文件路径，默认从系统命令中查找')
     args = parser.parse_args()
     try:
         if args.system and (platform.system() != 'Linux' or os.geteuid() != 0):
-            raise ValueError('系统模式需要 Linux 和 root 权限')
+            raise ValueError('管理系统服务需要 Linux 和 root 权限。请在已安装本工具的 Linux VPS 上运行 sudo sbmanager')
         directory = Path('/var/lib/sbmanager') if args.system else args.state_dir
         store = StateStore(directory)
         engine = SingBox(args.sing_box)

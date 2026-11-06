@@ -6,21 +6,21 @@ from sbmanager.system.network import check_reality_target
 
 
 def host(value):
-    value = text(value, '主机名')
+    value = text(value, 'IP 地址或域名')
     try:
         ipaddress.ip_address(value)
         return value
     except ValueError:
         if len(value) > 253 or not all(re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?', p) for p in value.rstrip('.').split('.')):
-            raise ValidationError('无效域名或 IP')
+            raise ValidationError('IP 地址或域名格式不正确。请只填写地址，不要加 http://、端口或路径')
         return value
 
 
 def websocket_path(value, existing=None):
     path = value or existing or '/' + secrets.token_urlsafe(16)
-    path = text(path, 'WS 路径')
+    path = text(path, 'WebSocket 路径')
     if not path.startswith('/') or any(c in path for c in ('?', '#', ' ')):
-        raise ValidationError('WS 路径必须以 / 开头，且不包含空格、查询串或片段')
+        raise ValidationError('WebSocket 路径必须以 / 开头，例如 /proxy；不能包含空格、? 或 #')
     return path
 
 
@@ -54,10 +54,10 @@ def ask_inbound_ports(ask, protocol, previous=None):
     except ValueError:
         raise ValidationError('端口必须是 1–65535 之间的整数') from None
     if not 1 <= port <= 65535:
-        raise ValidationError('端口范围为 1–65535')
+        raise ValidationError('端口必须是 1–65535 之间的整数，请重新填写')
     public_port = 443 if mode == 'cloudflare' else port
     if mode == 'cloudflare':
-        print(f'手机/电脑连接 Cloudflare 的 HTTPS 443；请在 Cloudflare 将回源端口设为 VPS 的 {port}。')
+        print(f'手机或电脑连接 Cloudflare 的 HTTPS 443 端口；Cloudflare 再连接 VPS 的 {port} 端口。请在 Cloudflare 的回源规则中设置此端口，程序不会自动设置。')
     else:
         print(f'{label}：手机/电脑连接时也使用 {port} 端口。')
     result = {'port': port, 'public_port': public_port}
@@ -75,7 +75,7 @@ def configure(manager, engine, inbound_id, values):
         values[field] = host(values[field])
     for field in ('port', 'public_port'):
         if type(values.get(field)) is not int or not 1 <= values[field] <= 65535:
-            raise ValidationError('端口范围为 1–65535')
+            raise ValidationError('端口必须是 1–65535 之间的整数，请重新填写')
     if inbound['protocol'] == 'reality':
         values['handshake'] = host(values['handshake'])
         check_reality_target(values['handshake'], values['server_name'], values.get('handshake_port', 443))
@@ -94,6 +94,6 @@ def configure(manager, engine, inbound_id, values):
 
 
 def ask_reality_names(ask):
-    target = host(ask('REALITY 握手目标域名'))
-    server_name = host(ask(f'REALITY SNI（默认 {target}，回车使用默认值）') or target)
+    target = host(ask('REALITY 目标网站域名（握手目标：需支持 TLS 1.3，不要加 https://）'))
+    server_name = host(ask(f'REALITY 证书域名（SNI，通常与目标网站相同；直接回车使用 {target}）') or target)
     return target, server_name

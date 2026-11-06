@@ -18,14 +18,14 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
     for key, inbound in state['inbounds'].items():
         settings = inbound.get('settings')
         if not settings:
-            raise ValidationError(f'入站 {inbound["name"]} 尚未配置部署参数')
+            raise ValidationError(f'节点 {inbound["name"]} 还没有设置地址和端口。请先选菜单 13 完成设置')
         protocol = inbound['protocol']
         port = settings.get('port')
         if type(port) is not int or not 1 <= port <= 65535:
-            raise ValidationError('无效入站端口')
+            raise ValidationError('节点端口不正确。请在菜单 13 填写 1–65535 之间的整数')
         transport = 'udp' if protocol == 'hysteria2' else 'tcp'
         if (transport, port) in ports:
-            raise ValidationError('入站监听端口冲突')
+            raise ValidationError('有多个节点使用了相同的 TCP 或 UDP 端口。请在菜单 13 为它们设置不同端口')
         ports.add((transport, port))
         users = []
         for uid, user in state['users'].items():
@@ -44,7 +44,7 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
             target = binding['active'] if binding else None
             if target is not None:
                 if target not in state['egress']:
-                    raise ValidationError('绑定引用不存在的出口')
+                    raise ValidationError('用户设置的出口已不存在。请在菜单 6 选择有效出口，或将出口 ID 留空改为直连')
                 if not state['egress'][target]['settings']['udp']:
                     config['route']['rules'].append({'inbound': [key], 'auth_user': [uid],
                                                     'network': 'udp', 'action': 'reject'})
@@ -64,5 +64,5 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
                 node['transport'] = {'type': 'ws', 'path': settings['path']}
         config['inbounds'].append(node)
     if not config['inbounds']:
-        raise ValidationError('至少配置一个入站')
+        raise ValidationError('还没有可用的节点设置。请先添加节点并设置地址和端口，或选菜单 26 完成首次设置')
     return config

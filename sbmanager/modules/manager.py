@@ -7,7 +7,7 @@ PROTOCOLS = ('reality', 'hysteria2', 'cloudflare_ws')
 
 def require(mapping, key, label):
     if key not in mapping:
-        raise ValidationError(f'{label}不存在')
+        raise ValidationError(f'找不到指定的{label}。请在菜单 1 查看当前设置，并复制正确的 ID')
     return mapping[key]
 
 
@@ -17,8 +17,8 @@ class Manager:
 
     def add_inbound(self, name, protocol):
         if protocol not in PROTOCOLS:
-            raise ValidationError('不支持的入站协议')
-        entry = {'id': identifier(), 'name': text(name, '名称'), 'protocol': protocol}
+            raise ValidationError('节点协议不支持。请输入 reality、hysteria2 或 cloudflare_ws')
+        entry = {'id': identifier(), 'name': text(name, '节点名称'), 'protocol': protocol}
         def change(state):
             state['inbounds'][entry['id']] = entry
             return entry['id']
@@ -28,7 +28,7 @@ class Manager:
         name = text(name, '用户名')
         def change(state):
             if any(u['name'] == name for u in state['users'].values()):
-                raise ValidationError('用户名已存在')
+                raise ValidationError('这个用户名已存在，请换一个名称')
             key = identifier()
             state['users'][key] = {'id': key, 'name': name, 'enabled': True, 'grants': {}}
             return key
@@ -37,23 +37,23 @@ class Manager:
     def grant(self, user_id, inbound_id):
         def change(state):
             user = require(state['users'], user_id, '用户')
-            inbound = require(state['inbounds'], inbound_id, '入站')
+            inbound = require(state['inbounds'], inbound_id, '节点')
             if inbound_id in user['grants']:
-                raise ValidationError('授权已存在')
+                raise ValidationError('这个用户已经可以使用该节点，无需重复开通')
             user['grants'][inbound_id] = credential(inbound['protocol'])
         self.store.update(change)
 
     def reset_credential(self, user_id, inbound_id):
         def change(state):
             user = require(state['users'], user_id, '用户')
-            require(user['grants'], inbound_id, '授权')
-            inbound = require(state['inbounds'], inbound_id, '入站')
+            require(user['grants'], inbound_id, '节点使用权限')
+            inbound = require(state['inbounds'], inbound_id, '节点')
             user['grants'][inbound_id] = credential(inbound['protocol'])
         self.store.update(change)
 
     def set_enabled(self, user_id, enabled):
         if type(enabled) is not bool:
-            raise ValidationError('启用状态必须是布尔值')
+            raise ValidationError('用户的启用设置格式不正确，必须为 true（启用）或 false（停用）')
         def change(state):
             require(state['users'], user_id, '用户')['enabled'] = enabled
         self.store.update(change)
@@ -61,7 +61,7 @@ class Manager:
     def revoke(self, user_id, inbound_id):
         def change(state):
             grants = require(state['users'], user_id, '用户')['grants']
-            require(grants, inbound_id, '授权')
+            require(grants, inbound_id, '节点使用权限')
             del grants[inbound_id]
             state['bindings'].pop(f'{user_id}:{inbound_id}', None)
         self.store.update(change)
@@ -88,14 +88,14 @@ class Manager:
         def change(state):
             require(state['egress'], egress_id, '出口')
             if any(egress_id in b['saved'] for b in state['bindings'].values()):
-                raise ValidationError('出口仍被引用，请先解除绑定')
+                raise ValidationError('还有用户保存了这个出口，暂时不能删除。请先在菜单 6 切换到其他出口或直连，再在菜单 12 移除它')
             del state['egress'][egress_id]
         self.store.update(change)
 
     def bind(self, user_id, inbound_id, egress_id=None):
         def change(state):
             user = require(state['users'], user_id, '用户')
-            require(user['grants'], inbound_id, '授权')
+            require(user['grants'], inbound_id, '节点使用权限')
             if egress_id is not None:
                 require(state['egress'], egress_id, '出口')
             key = f'{user_id}:{inbound_id}'
@@ -107,11 +107,11 @@ class Manager:
 
     def unbind(self, user_id, inbound_id, egress_id):
         def change(state):
-            binding = require(state['bindings'], f'{user_id}:{inbound_id}', '绑定')
+            binding = require(state['bindings'], f'{user_id}:{inbound_id}', '用户节点出口设置')
             if egress_id not in binding['saved']:
-                raise ValidationError('该出口未绑定')
+                raise ValidationError('这个用户在指定节点上没有保存该出口，请检查用户、节点和出口 ID')
             if binding['active'] == egress_id:
-                raise ValidationError('请先明确选择 DIRECT 或其他出口，再解除当前出口绑定')
+                raise ValidationError('这个出口正在使用，不能直接移除。请先在菜单 6 切换到其他出口，或将出口 ID 留空改为直连（DIRECT），再重试')
             binding['saved'].remove(egress_id)
         self.store.update(change)
 
