@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 - 每个用户在每个节点上可保存多个出口，并选择其中一个使用，或选择直连（DIRECT，不经过代理出口）。
 - 不支持 UDP 的代理出口会阻止 UDP 流量，不会偷偷改用 VPS 直连。
 - 由 sing-box 通过 ACME 申请和续期证书，管理器提供检查功能。
-- 导出分享链接和客户端 JSON 配置，查看 systemd 服务状态和日志。
+- 查看节点分享链接、systemd 服务状态和日志。
 - 修改配置前检查、备份，并通过操作锁避免同时写入；应用失败时尝试一起恢复管理数据和服务配置。
 
 不包含网页管理面板、多 VPS 管理、流量计费、自动出口切换或 Cloudflare API 自动配置。

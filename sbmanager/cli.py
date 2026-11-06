@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import sys
 import unicodedata
-from pathlib import Path
 from sbmanager.modules.node_manager import configure, ask_inbound_ports, PROTOCOL_LABELS
 from sbmanager.modules.export_manager import export_user
 from sbmanager.modules.certificate_manager import inspect
@@ -25,7 +24,7 @@ STYLES = {
 MENUS = (
     ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点')),
     ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '开通节点', '启用或停用',
-                  '取消节点权限', '重置连接密钥', '删除用户', '导出客户端配置')),
+                  '取消节点权限', '重置连接密钥', '删除用户')),
     ('出口管理', ('查看出口', '添加 SOCKS5', '切换用户出口', '测试连接', '修改出口',
                   '移除已保存的出口', '删除出口')),
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
@@ -90,7 +89,7 @@ def menu_heading(title):
 MENU_GROUPS = {
     '主菜单': {1: '配置管理', 4: '系统维护'},
     '节点管理': {1: '节点配置', 5: '初始化'},
-    '用户管理': {1: '用户与授权', 6: '权限与密钥', 9: '客户端'},
+    '用户管理': {1: '用户与授权', 6: '权限与密钥'},
     '出口管理': {1: '线路配置', 6: '移除与清理'},
     '服务管理': {1: '运行与诊断', 5: '更新与卸载'},
 }
@@ -258,20 +257,6 @@ def node_action(action, manager, engine):
             message('节点已删除')
 
 
-def export_client(manager):
-    state = manager.store.read()
-    uid = select_record(state['users'], '选择用户', 'users')
-    data = export_user(state, uid)
-    message('导出文件含连接密钥，请勿公开', tone='warning')
-    destination = Path(ask('保存到新目录')).expanduser()
-    if destination.exists():
-        raise ValueError('目录已存在，请换一个新目录')
-    destination.mkdir(parents=True, mode=0o700)
-    atomic_write(destination / 'client.json', encode(data['config']))
-    atomic_write(destination / 'links.txt', ('\n'.join(data['links']) + '\n').encode())
-    message('已导出 client.json 和 links.txt（权限 0600）')
-
-
 def user_action(action, manager):
     if action == 1:
         show_records(manager, 'users')
@@ -282,8 +267,6 @@ def user_action(action, manager):
         else:
             manager.add_user_all(name)
         message('用户已添加' if action == 2 else '用户已添加，已开通全部节点')
-    elif action == 9:
-        export_client(manager)
     elif action in (4, 6, 7):
         uid, iid = user_node(manager, granted=action != 4)
         if action == 4:
@@ -293,7 +276,7 @@ def user_action(action, manager):
             if confirm('将取消此节点权限，并移除对应出口设置。'):
                 manager.revoke(uid, iid)
                 message('节点权限已取消')
-        elif confirm('旧连接密钥将失效，需重新导出客户端配置。'):
+        elif confirm('旧连接密钥将失效，请到“节点管理 > 查看节点”获取新分享链接并更新客户端。'):
             manager.reset_credential(uid, iid)
             message('连接密钥已重置')
     else:

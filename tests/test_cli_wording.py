@@ -1,7 +1,6 @@
 """Exercise named selections, concise guidance, and safe menu operations."""
 import contextlib
 import io
-import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -65,7 +64,8 @@ class CliWordingTests(unittest.TestCase):
         before = self.store.read()['users'][self.user]['grants'][self.node]
         _, prompts = self.run_menu(['2', '7', '1', '1', 'no', '7', '1', '1', 'yes', '0', '0'])
         self.assertIn('旧连接密钥将失效', prompts)
-        self.assertIn('需重新导出客户端配置', prompts)
+        self.assertIn('节点管理 > 查看节点', prompts)
+        self.assertIn('获取新分享链接并更新客户端', prompts)
         self.assertNotEqual(before, self.store.read()['users'][self.user]['grants'][self.node])
 
     def test_direct_is_explicit_and_keeps_saved_egress(self):
@@ -187,18 +187,15 @@ class CliWordingTests(unittest.TestCase):
         self.assertNotIn('secret', output)
         self.assertIn('***', output)
 
-    def test_export_selects_user_and_preserves_file_permissions(self):
-        self.store.update(lambda state: state['inbounds'][self.node].update(settings={
-            'public_host': 'example.com', 'public_port': 443, 'port': 443,
-            'server_name': 'target.example', 'public_key': 'public', 'short_id': '0123456789abcdef'}))
-        destination = Path(self.temp.name) / 'export'
-        output, _ = self.run_menu(['2', '9', '1', str(destination), '0', '0'])
-        self.assertIn('文件含连接密钥', output)
-        self.assertTrue((destination / 'client.json').exists())
-        self.assertEqual(0o600, (destination / 'links.txt').stat().st_mode & 0o777)
-        self.assertEqual(0o700, destination.stat().st_mode & 0o777)
-        outbounds = json.loads((destination / 'client.json').read_text())['outbounds']
-        self.assertEqual([self.node], [item['tag'] for item in outbounds if item['type'] != 'selector'])
+    def test_user_menu_rejects_removed_export_option(self):
+        before = self.store.path.read_bytes()
+        output, prompts = self.run_menu(['2', '9', '0', '0'])
+        self.assertNotIn('导出客户端配置', output)
+        self.assertNotIn('[客户端]', output)
+        self.assertNotIn('保存到新目录', prompts)
+        self.assertIn('编号无效', output)
+        self.assertIn('请选择 [0-8]', prompts)
+        self.assertEqual(before, self.store.path.read_bytes())
 
     def test_remove_saved_egress_still_protects_active_binding(self):
         egress = self.add_proxy()
