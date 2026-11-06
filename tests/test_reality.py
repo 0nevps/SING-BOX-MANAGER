@@ -65,3 +65,24 @@ class RealityTests(unittest.TestCase):
                 with self.assertRaises(ValidationError):
                     wizard(manager, Mock(), ask)
             self.assertFalse(manager.store.path.exists())
+
+    def test_wizard_defaults_first_username_and_accepts_custom_name(self):
+        for answer, expected in [('', 'default'), ('Alice', 'Alice')]:
+            with self.subTest(answer=answer), tempfile.TemporaryDirectory() as directory:
+                manager = Manager(StateStore(directory))
+                engine = Mock()
+                engine.keypair.return_value = ('private', 'public')
+                ask = Mock(side_effect=[
+                    'proxy.example', answer, 'target.example', '', 'hy.example',
+                    'ws.example', '', '', '', '', '', '', '', 'yes',
+                ])
+                with patch('sbmanager.system.network.public_addresses', return_value={}), \
+                     patch('sbmanager.modules.initialization.check_reality_target', return_value='TLS 检查通过'), \
+                     patch('sbmanager.modules.initialization.socket.getaddrinfo'):
+                    wizard(manager, engine, ask)
+                users = list(manager.store.read()['users'].values())
+                self.assertEqual(1, len(users))
+                self.assertEqual(expected, users[0]['name'])
+                self.assertEqual(3, len(users[0]['grants']))
+                self.assertEqual(3, len(manager.store.read()['inbounds']))
+                self.assertIn('默认 default', ask.call_args_list[1].args[0])

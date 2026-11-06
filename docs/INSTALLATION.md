@@ -49,7 +49,7 @@ python3 scripts/package.py v0.1.0
 
 ## 首次使用
 
-运行 `sbmanager` 后进入初始化向导，准备公网地址、REALITY Server Name/握手目标、HY2/WS 域名及端口。完成资料保存后，选择“校验并部署”。安装和初始化资料保存成功均不代表节点已可连接。
+运行 `sbmanager` 后进入初始化向导，准备公网地址、REALITY Server Name/握手目标、HY2/WS 域名及端口。首个用户名直接回车默认为 `default`，也可自行填写。完成资料保存后，选择“校验并部署”。安装和初始化资料保存成功均不代表节点已可连接。
 
 ## 升级
 

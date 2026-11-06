@@ -18,7 +18,7 @@ def wizard(manager, engine, ask):
     print('检测到的公网地址（可手动修正）:', addresses or '检测失败')
     default_host = addresses.get('ipv4') or addresses.get('ipv6', '')
     public_host = host(ask(f'服务器公网 IP/域名（默认 {default_host}）') or default_host)
-    name = text(ask('首个用户名'), '用户名')
+    name = text(ask('首个用户名（默认 default）') or 'default', '用户名')
     handshake, server_name = ask_reality_names(ask)
     print(check_reality_target(handshake, server_name))
     hy_domain = host(ask('Hysteria2 证书域名'))
