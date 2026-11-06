@@ -50,7 +50,7 @@ class Manager:
             if any(user['name'] == name for user in state['users'].values()):
                 raise ValidationError('这个用户名已存在，请换一个名称')
             if not state['inbounds']:
-                raise ValidationError('暂无节点，请先添加节点或运行首次设置向导')
+                raise ValidationError('暂无节点，请先到“节点管理 > 添加节点”添加节点')
             uid = identifier()
             state['users'][uid] = {'id': uid, 'name': name, 'enabled': True,
                 'grants': {iid: credential(node['protocol']) for iid, node in state['inbounds'].items()}}

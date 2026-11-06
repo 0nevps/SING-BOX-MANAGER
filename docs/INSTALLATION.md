@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 ## 第一次设置
 
-节点是手机或电脑连接的入口。每次运行 `sudo sbmanager` 都先显示主菜单，没有节点数据时也不会自动进入安装。需要设置时，选择“1 节点管理 → 5 首次设置向导”，输入要安装的节点编号：`1 VLESS + REALITY + Vision`、`2 Hysteria2`、`3 VLESS + WebSocket + TLS`。可用空格或逗号分隔多选，例如 `1 3`；`0` 取消，留空不会默认安装全部。向导只创建选中的节点和第一个用户，并仅为该用户开通所选节点。已有用户或节点时，向导不会覆盖数据，应使用管理菜单修改。
+节点是手机或电脑连接的入口。每次运行 `sudo sbmanager` 都先显示主菜单，没有节点数据时也不会自动进入安装。选择“1 节点管理 → 2 添加节点”，按提示选择协议并填写参数，逐个添加需要的节点。然后通过“2 用户管理 → 2 添加用户”创建用户，再用“4 开通节点”授予节点权限；也可以选择“3 添加用户并开通全部节点”，一次创建新用户并开通全部已有节点。
 
 按所选协议准备，未选协议无需填写：
 
@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 - Hysteria2 和 WebSocket 的证书域名。
 - 各节点要在 VPS 上使用的端口。
 
-第一个用户名直接回车默认为 `default`，也可以自己填写。WebSocket 路径直接回车会随机生成，保存后会显示生成的路径。
+添加用户时需要填写用户名。WebSocket 路径直接回车会随机生成，保存后会显示生成的路径。
 
 每种协议只需要填写一次“在 VPS 上使用的端口”：
 

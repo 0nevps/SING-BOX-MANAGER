@@ -11,7 +11,7 @@ from sbmanager.modules.manager import Manager
 
 
 class StartupTests(unittest.TestCase):
-    def test_wizard_requires_menu_selection_and_cancel_returns_to_menu(self):
+    def test_node_menu_rejects_removed_option_without_changing_state(self):
         with tempfile.TemporaryDirectory() as directory:
             store = StateStore(directory)
             output = io.StringIO()
@@ -22,12 +22,13 @@ class StartupTests(unittest.TestCase):
                  patch('sbmanager.app.Deployment'), \
                  patch('sbmanager.app.Systemd'), \
                  patch('sbmanager.app.SingBox') as engine, \
-                 patch('builtins.input', side_effect=['1', '5', '0', '0', '0']) as reader, \
+                 patch('builtins.input', side_effect=['1', '5', '0', '0']) as reader, \
                  contextlib.redirect_stdout(output):
                 self.assertEqual(0, main())
             self.assertEqual(2, output.getvalue().count('主菜单'))
             self.assertEqual(2, output.getvalue().count('\n  节点管理\n'))
-            self.assertIn('选择要安装的节点', reader.call_args_list[2].args[0])
+            self.assertNotIn('首次设置向导', output.getvalue())
+            self.assertEqual(4, reader.call_count)
             engine.return_value.version.assert_not_called()
             self.assertFalse(store.path.exists())
 
@@ -47,7 +48,6 @@ class StartupTests(unittest.TestCase):
                      patch('sbmanager.app.SingBox', return_value=engine), \
                      patch('sbmanager.app.Systemd') as systemd, \
                      patch('sbmanager.app.Deployment') as deployment, \
-                     patch('sbmanager.modules.initialization.wizard') as wizard, \
                      patch('builtins.input', return_value='0') as reader, \
                      contextlib.redirect_stdout(output):
                     self.assertEqual(0, main())
@@ -59,7 +59,6 @@ class StartupTests(unittest.TestCase):
                 self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output.getvalue())
                 self.assertNotIn('首次设置：', output.getvalue())
                 self.assertEqual(1, reader.call_count)
-                wizard.assert_not_called()
                 engine.version.assert_not_called()
                 deployment.return_value.service.restart.assert_not_called()
                 after = store.path.read_bytes() if store.path.exists() else None

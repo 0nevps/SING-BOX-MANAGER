@@ -105,9 +105,3 @@ def configure(manager, engine, inbound_id, values, *, name=None, protocol=None):
         state['inbounds'][inbound['id']] = {**inbound, 'settings': values}
         return inbound['id']
     return manager.store.update(change)
-
-
-def ask_reality_names(ask):
-    target = host(ask('REALITY 目标域名（需支持 TLS 1.3）'))
-    server_name = host(ask(f'REALITY SNI（默认 {target}）') or target)
-    return target, server_name

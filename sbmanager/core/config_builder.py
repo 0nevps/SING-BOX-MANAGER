@@ -64,5 +64,5 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
                 node['transport'] = {'type': 'ws', 'path': settings['path']}
         config['inbounds'].append(node)
     if not config['inbounds']:
-        raise ValidationError('还没有可用的节点设置。请到“节点管理 > 首次设置向导”完成设置')
+        raise ValidationError('还没有可用的节点设置。请到“节点管理 > 添加节点”完成设置')
     return config

@@ -23,7 +23,7 @@ STYLES = {
     'error': '\033[31m',
 }
 MENUS = (
-    ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点', '首次设置向导')),
+    ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点')),
     ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '开通节点', '启用或停用',
                   '取消节点权限', '重置连接密钥', '删除用户', '导出客户端配置')),
     ('出口管理', ('查看出口', '添加 SOCKS5', '切换用户出口', '测试连接', '修改出口',
@@ -256,9 +256,6 @@ def node_action(action, manager, engine):
         if confirm(f'删除节点「{state["inbounds"][iid]["name"]}」及 {count} 个用户的节点权限和对应出口绑定；旧连接失效。'):
             manager.delete_inbound(iid)
             message('节点已删除')
-    elif action == 5:
-        from sbmanager.modules.initialization import wizard
-        wizard(manager, engine, ask)
 
 
 def export_client(manager):
