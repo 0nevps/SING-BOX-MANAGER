@@ -1,12 +1,13 @@
 import concurrent.futures
+import contextlib
+import io
 import json
 from pathlib import Path
-import subprocess
-import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from sbmanager.cli import run
 from sbmanager.core.state_manager import StateStore
 from sbmanager.modules.manager import Manager
 from sbmanager.security import ValidationError
@@ -109,12 +110,12 @@ class BusinessTests(unittest.TestCase):
         self.assertEqual(before, self.store.path.read_bytes())
 
     def test_cli_create_list_exit(self):
-        result = subprocess.run([sys.executable, 'main.py', '--state-dir', str(self.store.directory)],
-                                input='2\n2\nBob\n1\n0\n0\n', text=True, capture_output=True)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn('Bob', result.stdout)
-        self.assertIn('仅保存设置，不操作服务', result.stdout)
-        self.assertNotIn('secret', result.stdout)
+        output = io.StringIO()
+        with patch('builtins.input', side_effect=['2', '2', 'Bob', '1', '0', '0']), \
+             contextlib.redirect_stdout(output):
+            self.assertEqual(0, run(self.manager, Mock(), Mock()))
+        self.assertIn('Bob', output.getvalue())
+        self.assertNotIn('secret', output.getvalue())
 
     def test_invalid_profile_is_rejected(self):
         for port in (True, 0, 65536, '1080'):

@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 ## 系统与网络要求
 
 - 安装脚本支持 Debian 12/13 和 Ubuntu 22.04/24.04，系统需要使用 systemd；其他版本暂不支持。
-- 安装和管理服务需要 root 权限。VPS 需要能下载系统依赖、访问 GitHub API 和源码下载服务，以及下载 sing-box 官方发布文件。
+- 安装和运行管理程序都要求 Linux + root。`sbmanager` 和 `python3 main.py` 均管理真实系统服务，统一使用 `/var/lib/sbmanager/` 保存数据、`/etc/sbmanager/config.json` 保存服务配置。VPS 需要能下载系统依赖、访问 GitHub API 和源码下载服务，以及下载 sing-box 官方发布文件。
 - 安装器会检查和准备 Python 3，程序主要使用 Python 标准库。
 - sing-box 兼容范围为 1.14.x，且必须支持 ACME Certificate Provider（证书申请功能）。
 - 使用 HTTP-01 申请证书时，域名必须指向正确地址，公网 TCP 80 必须能到达 VPS 源站。不支持 DNS-01 验证方式。
@@ -64,7 +64,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 程序保存到 `/opt/sbmanager/builds/` 下独立目录，通过 `current` 链接切换。每次运行安装器都会获取当前源码，不会因已安装而跳过。用户、节点、服务配置和备份与程序分开保存；更新前保留旧程序和数据备份，失败时尝试恢复旧程序。恢复后请检查服务状态和数据。
 
-## 项目结构与本地开发
+## 项目结构与开发测试
 
 相关文档：
 
@@ -80,14 +80,13 @@ tests/           自动化测试
 docs/            安装、使用和故障排查等文档
 ```
 
-本地模式可在 macOS/Linux 上运行，不需要 root 或第三方 Python 包：
+开发时可在 macOS/Linux 上运行模拟系统操作的 unittest，不需要 root 或第三方 Python 包：
 
 ```bash
-python3 main.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-默认数据目录为 `~/.local/state/sbmanager-dev`，可用 `--state-dir /path/to/directory` 指定其他目录。目录中有连接密钥等敏感信息，不要放入代码仓库。手工操作时，先在“1 节点管理”中添加节点并设置地址和端口，再在“2 用户管理”中添加用户、开通节点；需要代理出口时，到“3 出口管理”添加并切换出口。按名称和列表编号选择对象即可。**本地模式只保存管理数据，不会启动或更新 sing-box 系统服务。**
+`python3 main.py` 不是隔离的开发入口：它与安装后的 `sbmanager` 一样要求 Linux + root，使用相同的管理数据和服务配置，并操作真实系统服务。可用 `--sing-box /path/to/sing-box` 指定 sing-box 程序文件；这不会隔离数据或服务。真实安装和服务操作应在可丢弃的 Debian/Ubuntu 环境中验证。
 
 自动化测试包含用户节点权限隔离、出口删除保护、连接密钥重置、用户停用和删除、文件权限与敏感信息隐藏、写入失败、多个进程同时修改以及菜单操作。安装脚本可用 `bash -n install.sh` 和 ShellCheck 检查；这些检查不能代替安装、systemd、证书和客户端连接的 Linux 实测。
 
@@ -102,4 +101,4 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 - [安装与升级](docs/INSTALLATION.md)
 - [使用指南](docs/USER_GUIDE.md)
 
-安装后的系统模式只能在 Linux 上以 root 权限使用。首次成功启动服务后，用户、节点和出口等设置的修改会自动更新服务；本地模式不会操作系统服务。
+首次设置仍需从菜单主动选择，并显式执行“检查配置并启动服务”。首次成功启动服务后，用户、节点和出口等设置的修改会自动检查并更新真实系统服务。

@@ -272,7 +272,7 @@ def show_certificates(manager):
         print('  ' + certificate['error'] if 'error' in certificate else '  到期：' + str(certificate['expires']))
     if not result['domains'] and not result['certificates']:
         message('暂无证书记录', tone='warning')
-    message('仅检查 DNS 和本地证书，不代表签发或续期成功；失败请查看服务日志。', tone='warning')
+    message('检查范围：DNS、本地证书', tone='warning')
 
 
 def service_action(action, manager, deployment):
@@ -285,7 +285,6 @@ def service_action(action, manager, deployment):
             state['deployed'] = True
         manager.store.update(activate)
         message('配置已生效，服务和端口检查通过')
-        message('请用客户端测试连接', tone='warning')
     elif action == 3:
         deployment.service.logs()
     elif action == 4:
@@ -333,15 +332,11 @@ def advanced_action(action, manager):
         print('节点：客户端连接的入口。\n'
               '用户：独立的连接身份，可分配节点权限。\n'
               '出口：VPS 访问网络使用的线路；直连不经过代理。\n'
-              '连接密钥：客户端认证信息，请勿公开。\n'
-              '系统模式：首次启动后，修改设置会自动应用。\n'
-              '本地模式：只保存设置，不操作系统服务。')
+              '连接密钥：客户端认证信息，请勿公开。')
 
 
-def run(manager, engine=None, deployment=None):
+def run(manager, engine, deployment):
     print('\n' + styled('SING-BOX MANAGER', 'title'))
-    message('服务器管理模式 · 首次启动后，修改自动应用' if deployment else '本地测试模式 · 仅保存设置，不操作服务',
-            tone='accent' if deployment else 'warning')
     section = None
     while True:
         try:
@@ -353,9 +348,6 @@ def run(manager, engine=None, deployment=None):
                 action = choose(title, enumerate(labels, 1), back='返回')
             except Cancelled:
                 section = None
-                continue
-            if section in (4, 5) and not deployment:
-                message('此操作需在 Linux VPS 上运行 sudo sbmanager', tone='warning')
                 continue
             if section == 1:
                 node_action(action, manager, engine)

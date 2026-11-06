@@ -39,10 +39,17 @@ class InstallerMenuTests(unittest.TestCase):
             result = subprocess.run(['bash', '-c', function + '\nopen_menu'],
                                     input='', capture_output=True, text=True, timeout=10)
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertIn('sudo sbmanager', result.stdout)
-            self.assertIn('当前没有交互终端', result.stdout)
+            self.assertEqual('运行 sudo sbmanager 打开菜单。\n', result.stdout)
+
+    def test_installed_command_uses_service_entrypoint(self):
+        wrapper = self.source.split("<<'WRAPPER'\n", 1)[1].split('\nWRAPPER', 1)[0]
+        self.assertEqual(
+            '#!/bin/sh\n'
+            'exec python3 /opt/sbmanager/current/main.py '
+            '--sing-box /opt/sbmanager/current/sing-box "$@"', wrapper)
 
     def test_first_and_repeat_install_open_menu_after_success(self):
         self.assertNotIn('无需重复安装', self.source)
+        self.assertNotIn('程序安装完成，即将打开管理菜单', self.source)
         completion = self.source[self.source.index('rollback_ready=0\n'):]
         self.assertTrue(completion.endswith('\nopen_menu\n'))

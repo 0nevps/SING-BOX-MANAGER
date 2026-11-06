@@ -23,6 +23,7 @@ class CliWordingTests(unittest.TestCase):
         self.manager.grant(self.user, self.node)
 
     def run_menu(self, answers, deployment=None):
+        deployment = deployment if deployment is not None else Mock()
         output = io.StringIO()
         with patch('builtins.input', side_effect=answers) as reader, contextlib.redirect_stdout(output):
             result = run(self.manager, Mock(), deployment)
@@ -42,11 +43,13 @@ class CliWordingTests(unittest.TestCase):
         self.assertIn('独立的连接身份', output)
         self.assertIn('直连不经过代理', output)
 
-    def test_unsupported_local_action_explains_where_to_run_it(self):
+    def test_service_status_uses_connected_service(self):
         before = self.store.path.read_bytes()
-        output, _ = self.run_menu(['4', '2', '0', '0'])
-        self.assertIn('Linux VPS', output)
-        self.assertIn('sudo sbmanager', output)
+        deployment = Mock()
+        deployment.service.active.return_value = True
+        output, _ = self.run_menu(['4', '1', '0', '0'], deployment)
+        deployment.service.active.assert_called_once_with()
+        self.assertIn('服务运行中', output)
         self.assertEqual(before, self.store.path.read_bytes())
 
     def test_delete_cancellation_warns_and_preserves_data(self):
@@ -250,7 +253,8 @@ class CliWordingTests(unittest.TestCase):
         deployment.prune.assert_called_once_with(2)
         self.assertTrue(self.store.read()['deployed'])
         self.assertEqual(2, self.store.read()['backup_keep'])
-        self.assertIn('请用客户端测试连接', output)
+        self.assertIn('配置已生效，服务和端口检查通过', output)
+        self.assertNotIn('请用客户端测试连接', output)
 
     def test_certificate_output_is_not_raw_json(self):
         result = {'domains': [{'domain': 'node.example', 'addresses': ['192.0.2.1']}],
@@ -259,7 +263,8 @@ class CliWordingTests(unittest.TestCase):
             output, _ = self.run_menu(['4', '4', '0', '0'], Mock())
         self.assertIn('域名：node.example', output)
         self.assertIn('到期：Jan 1 2030', output)
-        self.assertIn('不代表签发或续期成功', output)
+        self.assertIn('检查范围：DNS、本地证书', output)
+        self.assertNotIn('不代表签发或续期成功', output)
         self.assertNotIn('"domains"', output)
 
     def test_backup_retention_cancellation_does_not_prune(self):

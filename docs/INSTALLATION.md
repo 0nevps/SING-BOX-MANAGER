@@ -60,16 +60,17 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 升级失败时，安装器会尝试恢复旧程序和原有服务设置。请检查服务状态和提示中的备份位置，不要把“尝试恢复”当作恢复成功的保证。
 
-只升级 sing-box 时，使用“4 服务管理 → 5 升级sing-box”，填写明确的 1.14.x 版本。系统模式下才能执行此操作；升级后的运行情况仍需检查。
+只升级 sing-box 时，使用“4 服务管理 → 5 升级sing-box”，填写明确的 1.14.x 版本；升级后的运行情况仍需检查。
 
-## 本地开发
+## 从源码运行与开发测试
 
-需要 Python 3.10+，支持 macOS/Linux，不需要第三方 Python 包：
+`sbmanager` 和从源码运行的 `python3 main.py` 都要求 Linux + root，统一使用 `/var/lib/sbmanager/` 和 `/etc/sbmanager/config.json`，会操作真实系统服务。从源码启动不能代替安装器准备依赖和 systemd 服务。可通过 `--sing-box /path/to/sing-box` 指定可执行的 1.14.x 程序文件；这不会隔离管理数据或系统服务。
+
+开发测试需要 Python 3.10+，可在 macOS/Linux 上运行，不需要 root 或第三方 Python 包。测试中的系统操作使用模拟，不应通过启动管理程序进行隔离测试：
 
 ```bash
-python3 main.py
 python3 -m unittest discover -s tests -v
 bash -n install.sh
 ```
 
-本地模式只保存管理数据，不启动 systemd，也不应用系统服务配置。可通过 `--sing-box /path/to/sing-box` 指定 1.14.x 程序文件，使用首次设置、节点配置和导出等相关功能；需要调用 sing-box 的功能仍要求该文件可执行。本地运行不能代替 Linux 上的安装、服务和客户端连接测试。
+这些测试不能代替 Linux 上的安装、服务和客户端连接测试。

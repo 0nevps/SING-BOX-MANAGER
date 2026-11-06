@@ -23,7 +23,7 @@ open_menu() {
     if ( : </dev/tty >/dev/tty ) 2>/dev/null; then
         /usr/local/bin/sbmanager </dev/tty >/dev/tty
     else
-        echo '当前没有交互终端，未打开菜单。请通过 SSH 登录后运行 sudo sbmanager。'
+        echo '运行 sudo sbmanager 打开菜单。'
     fi
 }
 download_source() {
@@ -161,7 +161,7 @@ ln -s "$install_dir" /opt/sbmanager/current.new
 mv -Tf /opt/sbmanager/current.new /opt/sbmanager/current
 cat > /usr/local/bin/sbmanager <<'WRAPPER'
 #!/bin/sh
-exec python3 /opt/sbmanager/current/main.py --system --sing-box /opt/sbmanager/current/sing-box "$@"
+exec python3 /opt/sbmanager/current/main.py --sing-box /opt/sbmanager/current/sing-box "$@"
 WRAPPER
 chmod 755 /usr/local/bin/sbmanager
 cat > /etc/systemd/system/sbmanager-sing-box.service <<'UNIT'
@@ -192,5 +192,4 @@ if [[ $was_active -eq 1 ]]; then
     fi
 fi
 rollback_ready=0
-echo '程序安装完成，即将打开管理菜单，不会自动安装节点。需要时选择“节点管理 > 首次设置向导”，自行选择要安装的节点，再到“服务管理 > 检查配置并启动服务”。安装完成不代表节点或证书已可用，请再用客户端测试连接。'
 open_menu

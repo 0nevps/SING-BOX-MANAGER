@@ -47,6 +47,11 @@ class InitializationSelectionTests(unittest.TestCase):
                 self.assertEqual(protocol != 'reality', dns.called)
                 self.assertEqual(protocol != 'reality', '证书验证需要' in output)
                 self.assertEqual(protocol == 'cloudflare_ws', 'WebSocket 路径:' in output)
+                self.assertTrue(output.endswith('首次设置已保存。\n'))
+                self.assertNotIn('下一步：', output)
+                self.assertNotIn('请用客户端测试连接', output)
+                if protocol != 'reality':
+                    self.assertIn('证书验证需要公网 TCP 80 可达；Cloudflare 验证请求须转发到本机。', output)
 
     def test_select_subset_deduplicates_and_skips_reality(self):
         manager, engine, _, _, addresses, probe, dns = self.run_wizard(
@@ -64,7 +69,8 @@ class InitializationSelectionTests(unittest.TestCase):
         manager, engine, ask, output, addresses, probe, dns = self.run_wizard(
             ['', '4', '1 x', '0 2', '0'])
         self.assertEqual(5, ask.call_count)
-        self.assertIn('请选择节点编号', output)
+        self.assertEqual(4, output.count('编号无效，请输入 1、2、3，可多选'))
+        self.assertNotIn('不会默认安装全部', output)
         self.assertFalse(manager.store.path.exists())
         engine.version.assert_not_called()
         engine.keypair.assert_not_called()

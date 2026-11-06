@@ -21,7 +21,7 @@ class CliPresentationTests(unittest.TestCase):
         with patch.dict(os.environ, environment or {'TERM': 'xterm-256color'}, clear=True), \
                 patch('builtins.input', side_effect=answers) as reader, \
                 contextlib.redirect_stdout(output):
-            self.assertEqual(0, run(manager))
+            self.assertEqual(0, run(manager, Mock(), Mock()))
         return output.getvalue(), '\n'.join(call.args[0] for call in reader.call_args_list)
 
     def test_main_menu_has_only_six_categories_and_exit(self):
@@ -34,6 +34,7 @@ class CliPresentationTests(unittest.TestCase):
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)
         self.assertLessEqual(len(output.splitlines()), 14)
+        self.assertTrue(output.startswith('\nSING-BOX MANAGER\n\n主菜单\n'))
 
     def test_submenu_returns_to_main(self):
         output, _ = self.run_menu(['2', '0', '0'])
@@ -52,7 +53,6 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('\x1b[1;36mSING-BOX MANAGER\x1b[0m', output)
         self.assertIn('\x1b[36m 1\x1b[0m 节点管理', output)
         self.assertIn('\x1b[31m 8 删除用户\x1b[0m', output)
-        self.assertIn('\x1b[33m本地测试模式', output)
         self.assertIn('\x1b[36m', prompts)
 
     def test_no_color_and_dumb_terminal_disable_colors(self):
@@ -77,7 +77,7 @@ class CliPresentationTests(unittest.TestCase):
         for error in (KeyboardInterrupt, EOFError):
             with self.subTest(error=error), patch('builtins.input', side_effect=error), \
                     contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(0, run(Mock()))
+                self.assertEqual(0, run(Mock(), Mock(), Mock()))
 
 
 if __name__ == '__main__':

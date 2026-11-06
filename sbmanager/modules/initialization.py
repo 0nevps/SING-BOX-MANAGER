@@ -19,7 +19,7 @@ def wizard(manager, engine, ask):
             return
         if choices and all(choice in ('1', '2', '3') for choice in choices):
             break
-        print('请选择节点编号 1、2、3，可多选；输入 0 取消，不会默认安装全部。')
+        print('编号无效，请输入 1、2、3，可多选')
     protocols = [protocol for number, protocol in (('1', 'reality'), ('2', 'hysteria2'), ('3', 'cloudflare_ws'))
                  if number in choices]
     engine.version()
@@ -47,8 +47,7 @@ def wizard(manager, engine, ask):
         except OSError:
             raise ValidationError(f'找不到域名 {domain} 对应的 IP。请检查域名拼写和 DNS 记录，等待解析生效后重试') from None
     if any(protocol != 'reality' for protocol in protocols):
-        print('证书验证需要公网 TCP 80 可达；请放行防火墙和安全组。\n'
-              '使用 Cloudflare 时，验证请求也必须转发到本机；DNS 解析成功不代表端口可达。')
+        print('证书验证需要公网 TCP 80 可达；Cloudflare 验证请求须转发到本机。')
     nodes = []
     for protocol in protocols:
         domain = domains[protocol]
@@ -72,6 +71,4 @@ def wizard(manager, engine, ask):
     manager.store.update(initialize)
     if 'cloudflare_ws' in protocols:
         print('WebSocket 路径:', ws_path)
-    print('首次设置已保存。\n'
-          '下一步：服务管理 > 检查配置并启动服务、检查证书；用户管理 > 导出客户端配置。\n'
-          '请用客户端测试连接；本地模式不会启动服务。')
+    print('首次设置已保存。')
