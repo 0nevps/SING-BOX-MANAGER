@@ -31,7 +31,7 @@ MENUS = (
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
                   '更新管理程序', '卸载全部')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
-    ('高级与帮助', ('查看原始设置 JSON', '术语帮助')),
+    ('高级与帮助', ('查看原始设置 JSON',)),
 )
 DANGEROUS = {'删除节点', '删除用户', '删除出口', '卸载全部'}
 CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序'}
@@ -436,11 +436,6 @@ def backup_action(action, manager, deployment):
 def advanced_action(action, manager):
     if action == 1:
         print(json.dumps(manager.summary(), ensure_ascii=False, indent=2))
-    else:
-        print('节点：客户端连接的入口。\n'
-              '用户：独立的连接身份，可分配节点权限。\n'
-              '出口：VPS 访问网络使用的线路；直连不经过代理。\n'
-              '连接密钥：客户端认证信息，请勿公开。')
 
 
 def run(manager, engine, deployment):

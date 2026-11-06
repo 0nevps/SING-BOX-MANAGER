@@ -36,12 +36,14 @@ class CliWordingTests(unittest.TestCase):
             'server': 'proxy.example.com', 'port': 1080,
             'username': 'alice', 'password': 'secret', 'udp': False})
 
-    def test_help_is_only_shown_on_request(self):
-        output, _ = self.run_menu(['0'])
+    def test_advanced_menu_rejects_removed_help_option(self):
+        before = self.store.path.read_bytes()
+        output, prompts = self.run_menu(['6', '2', '0', '0'])
+        self.assertNotIn('术语帮助', output)
         self.assertNotIn('独立的连接身份', output)
-        output, _ = self.run_menu(['6', '2', '0', '0'])
-        self.assertIn('独立的连接身份', output)
-        self.assertIn('直连不经过代理', output)
+        self.assertIn('编号无效', output)
+        self.assertIn('请选择 [0-1]', prompts)
+        self.assertEqual(before, self.store.path.read_bytes())
 
     def test_service_status_uses_connected_service(self):
         before = self.store.path.read_bytes()
