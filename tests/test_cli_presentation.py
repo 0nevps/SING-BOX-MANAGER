@@ -33,7 +33,7 @@ class CliPresentationTests(unittest.TestCase):
             self.assertIn(title, output)
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)
-        self.assertLessEqual(len(output.splitlines()), 18)
+        self.assertLessEqual(len(output.splitlines()), 20)
         self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output)
         self.assertIn('[配置管理]', output)
         self.assertIn('[系统维护]', output)
@@ -80,7 +80,8 @@ class CliPresentationTests(unittest.TestCase):
         output, prompts = self.run_menu(['4', '0', '0'])
         self.assertIn('卸载全部 [危险]', output)
         self.assertIn('更新管理程序 [注意]', output)
-        self.assertIn('请选择 [0-7]', prompts)
+        self.assertIn('开启 BBR [注意]', output)
+        self.assertIn('请选择 [0-8]', prompts)
 
     def test_narrow_menu_wraps_chinese_without_losing_labels(self):
         import unicodedata
@@ -96,13 +97,16 @@ class CliPresentationTests(unittest.TestCase):
             self.assertLessEqual(cells, 23)
         self.assertIn(''.join(label.split()), ''.join(output.getvalue().split()))
 
-    def test_menu_rendering_does_not_query_state_or_service(self):
+    def test_only_main_menu_queries_live_status_without_reading_state(self):
         manager, deployment = Mock(), Mock()
         with patch('builtins.input', side_effect=['4', '0', '0']), \
+                patch('sbmanager.cli.bbr.enabled', return_value=False) as enabled, \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(0, run(manager, Mock(), deployment))
         manager.store.read.assert_not_called()
-        deployment.service.active.assert_not_called()
+        self.assertEqual(2, deployment.service.active.call_count)
+        self.assertEqual(2, enabled.call_count)
+        deployment.service.restart.assert_not_called()
 
     def test_input_starts_on_its_own_line_and_strips_whitespace(self):
         with patch('builtins.input', return_value='  value  ') as reader, \

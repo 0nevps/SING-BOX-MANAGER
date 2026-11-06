@@ -11,7 +11,7 @@ case "$ID:$VERSION_ID" in debian:12|debian:13|ubuntu:22.04|ubuntu:24.04) ;; *) e
 command -v systemctl >/dev/null || { echo '找不到 systemctl 命令，无法管理服务。请使用带有 systemd 的完整 Linux 系统' >&2; exit 1; }
 case $(uname -m) in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; *) echo '不支持这台机器的 CPU 类型，目前仅支持 x86_64 和 ARM64' >&2; exit 1;; esac
 apt-get update
-apt-get install -y python3 ca-certificates curl tar iproute2 util-linux
+apt-get install -y python3 ca-certificates curl tar iproute2 util-linux procps kmod
 exec 9>/run/sbmanager-install.lock
 flock -n 9 || { echo '另一个安装、更新或卸载操作正在进行。请等待完成后重试' >&2; exit 1; }
 tmp=$(mktemp -d)

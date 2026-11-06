@@ -49,7 +49,7 @@ class CliWordingTests(unittest.TestCase):
         deployment = Mock()
         deployment.service.active.return_value = True
         output, _ = self.run_menu(['4', '1', '0', '0'], deployment)
-        deployment.service.active.assert_called_once_with()
+        self.assertEqual(3, deployment.service.active.call_count)
         self.assertIn('服务运行中', output)
         self.assertEqual(before, self.store.path.read_bytes())
 

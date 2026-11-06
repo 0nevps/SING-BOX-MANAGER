@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复运行安装器会重新获取源码，完成后也会打开主菜单。
 
-安装器会准备 Python、curl、CA 证书、tar、iproute2 和 flock。sing-box 固定使用 1.14.4，兼容范围为 1.14.x；仍从 sing-box 官方 GitHub Release 下载，并按官方发布文件的摘要进行校验，管理程序的更新不依赖这些发布文件。下载失败、缺少官方摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
+安装器会准备 Python、curl、CA 证书、tar、iproute2、flock，以及提供 sysctl 和 modprobe 的 procps、kmod。sing-box 固定使用 1.14.4，兼容范围为 1.14.x；仍从 sing-box 官方 GitHub Release 下载，并按官方发布文件的摘要进行校验，管理程序的更新不依赖这些发布文件。下载失败、缺少官方摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
 
 ## 安装后文件放在哪里
 

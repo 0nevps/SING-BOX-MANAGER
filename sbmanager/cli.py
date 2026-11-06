@@ -11,6 +11,7 @@ from sbmanager.modules.certificate_manager import inspect
 from sbmanager.core.transaction_manager import atomic_write, encode
 from sbmanager.egress.registry import driver
 from sbmanager.egress.links import parse_link
+from sbmanager.system import bbr
 
 
 STYLES = {
@@ -28,13 +29,13 @@ MENUS = (
     ('出口管理', ('查看出口', '添加出口', '切换用户出口', '测试连接', '修改出口',
                   '移除已保存的出口', '删除出口')),
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
-                  '更新管理程序', '卸载全部')),
+                  '更新管理程序', '卸载全部', '开启 BBR')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
     ('高级与帮助', ('查看原始设置 JSON',)),
     ('端口转发', ('查看转发', '添加转发', '删除转发')),
 )
 DANGEROUS = {'删除节点', '删除用户', '删除出口', '删除转发', '卸载全部'}
-CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序'}
+CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序', '开启 BBR'}
 
 
 class Cancelled(Exception):
@@ -96,7 +97,25 @@ MENU_GROUPS = {
 }
 
 
-def choose(title, options, back='取消'):
+def main_status(deployment):
+    """Refresh live status without loading or mutating business state."""
+    try:
+        active = deployment.service.active()
+        service = '运行中' if active else '未运行'
+        service_tone = 'success' if active else 'warning'
+    except (OSError, ValueError, subprocess.SubprocessError):
+        service, service_tone = '未知（读取失败）', 'warning'
+    try:
+        active = bbr.enabled()
+        congestion = '已开启' if active else '未开启'
+        bbr_tone = 'success' if active else 'warning'
+    except (OSError, ValueError):
+        congestion, bbr_tone = '未知（读取失败）', 'warning'
+    menu_text(f'BBR：{congestion}', tone=bbr_tone)
+    menu_text(f'sing-box 服务：{service}', tone=service_tone)
+
+
+def choose(title, options, back='取消', status=None):
     """Select a value by its visible number; zero never selects an object."""
     options = list(options)
     if not options:
@@ -104,6 +123,8 @@ def choose(title, options, back='取消'):
         raise Cancelled
     while True:
         menu_heading(title)
+        if status is not None:
+            status()
         groups = MENU_GROUPS.get(title, {}) if back != '取消' else {}
         for number, (_, label) in enumerate(options, 1):
             if number in groups:
@@ -432,6 +453,12 @@ def service_action(action, manager, deployment):
             uninstall()
             message('已卸载全部安装文件、数据、配置和 sbmanager 指令')
             return True
+    elif action == 8:
+        if confirm('将修改全机 TCP 默认拥塞控制为 BBR、默认队列为 fq，并写入 '
+                   '/etc/sysctl.d/99-sbmanager-bbr.conf 持久保存；影响不只限于 sing-box。'
+                   '不更换内核，不重启服务。'):
+            bbr.enable()
+            message('BBR 已开启，fq / bbr 运行参数已检查，重启配置已保存')
 
 
 def backup_action(action, manager, deployment):
@@ -472,7 +499,8 @@ def run(manager, engine, deployment):
     while True:
         try:
             if section is None:
-                section = choose('主菜单', ((number, menu[0]) for number, menu in enumerate(MENUS, 1)), back='退出')
+                section = choose('主菜单', ((number, menu[0]) for number, menu in enumerate(MENUS, 1)),
+                                 back='退出', status=lambda: main_status(deployment))
                 continue
             title, labels = MENUS[section - 1]
             try:
