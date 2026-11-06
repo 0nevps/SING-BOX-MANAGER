@@ -24,6 +24,16 @@ class Manager:
             return entry['id']
         return self.store.update(change)
 
+    def delete_inbound(self, inbound_id):
+        def change(state):
+            require(state['inbounds'], inbound_id, '节点')
+            del state['inbounds'][inbound_id]
+            for user in state['users'].values():
+                user['grants'].pop(inbound_id, None)
+            state['bindings'] = {key: value for key, value in state['bindings'].items()
+                                 if value['inbound_id'] != inbound_id}
+        self.store.update(change)
+
     def add_user(self, name):
         name = text(name, '用户名')
         def change(state):

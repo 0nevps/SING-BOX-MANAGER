@@ -22,7 +22,7 @@ class StartupTests(unittest.TestCase):
                  patch('sbmanager.app.Deployment'), \
                  patch('sbmanager.app.Systemd'), \
                  patch('sbmanager.app.SingBox') as engine, \
-                 patch('builtins.input', side_effect=['1', '4', '0', '0', '0']) as reader, \
+                 patch('builtins.input', side_effect=['1', '5', '0', '0', '0']) as reader, \
                  contextlib.redirect_stdout(output):
                 self.assertEqual(0, main())
             self.assertEqual(2, output.getvalue().count('主菜单'))

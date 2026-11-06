@@ -3,16 +3,18 @@ from urllib.parse import urlencode, quote
 from sbmanager.security import ValidationError
 
 
-def export_user(state, user_id):
+def export_user(state, user_id, inbound_id=None):
     user = state['users'].get(user_id)
     if not user or not user['enabled']:
         raise ValidationError('找不到用户，或该用户已停用。请在“用户管理 > 启用或停用”核对并启用用户，再到“导出客户端配置”重试')
     outbounds, links = [], []
     for iid, secret in user['grants'].items():
+        if inbound_id is not None and iid != inbound_id:
+            continue
         inbound = state['inbounds'][iid]
         settings = inbound.get('settings')
         if not settings:
-            raise ValidationError('节点还没有设置地址和端口。请到“节点管理 > 设置地址和端口”完成设置，再导出')
+            raise ValidationError('节点尚未配置完整，请到“节点管理 > 修改节点”完成设置')
         protocol = inbound['protocol']
         host = settings['public_host']
         port = settings.get('public_port', settings['port'])

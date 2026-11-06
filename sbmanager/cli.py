@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from sbmanager.modules.node_manager import configure, ask_reality_names, ask_inbound_ports
+from sbmanager.modules.node_manager import configure, ask_inbound_ports, PROTOCOL_LABELS
 from sbmanager.modules.export_manager import export_user
 from sbmanager.modules.certificate_manager import inspect
 from sbmanager.core.transaction_manager import atomic_write, encode
@@ -20,9 +20,8 @@ STYLES = {
     'warning': '\033[33m',
     'error': '\033[31m',
 }
-PROTOCOL_LABELS = {'reality': 'REALITY', 'hysteria2': 'Hysteria2', 'cloudflare_ws': 'WebSocket'}
 MENUS = (
-    ('节点管理', ('查看节点', '添加节点', '设置地址和端口', '首次设置向导')),
+    ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点', '首次设置向导')),
     ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '开通节点', '启用或停用',
                   '取消节点权限', '重置连接密钥', '删除用户', '导出客户端配置')),
     ('出口管理', ('查看出口', '添加 SOCKS5', '切换用户出口', '测试连接', '修改出口',
@@ -32,7 +31,7 @@ MENUS = (
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
     ('高级与帮助', ('查看原始设置 JSON', '术语帮助')),
 )
-DANGEROUS = {'删除用户', '删除出口', '卸载全部'}
+DANGEROUS = {'删除节点', '删除用户', '删除出口', '卸载全部'}
 CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序'}
 
 
@@ -119,6 +118,23 @@ def show_records(manager, kind):
             settings = record.get('settings', {})
             print('  协议：' + PROTOCOL_LABELS[record['protocol']])
             print(f'  地址：{settings["public_host"]}:{settings.get("public_port", settings["port"])}' if settings else '  地址：未配置')
+            if settings:
+                print(f'  监听端口：{settings["port"]} · SNI：{settings.get("server_name", "—")}')
+                for field, label in (('handshake', '握手目标'), ('path', 'WebSocket 路径'),
+                                     ('connection_mode', '连接方式')):
+                    if field in settings:
+                        print(f'  {label}：{settings[field]}')
+            users = [user for user in state['users'].values()
+                     if user['enabled'] and record['id'] in user['grants']]
+            if not settings:
+                print('  分享链接：节点未配置完整')
+            elif not users:
+                print('  分享链接：无已启用的授权用户')
+            else:
+                message('  分享链接含连接密钥，请勿公开', tone='warning')
+                for user in users:
+                    print(f'  用户：{user["name"]}')
+                    print(export_user(state, user['id'], record['id'])['links'][0])
         elif kind == 'users':
             message('  状态：' + ('启用' if record['enabled'] else '停用'),
                     tone='success' if record['enabled'] else 'warning')
@@ -135,36 +151,62 @@ def show_records(manager, kind):
             print('  UDP：' + ('声明支持，未验证' if settings['udp'] else '已阻止'))
 
 
-def edit_node(manager, engine):
-    state = manager.store.read()
-    iid = select_record(state['inbounds'], '选择节点', 'inbounds')
-    inbound = state['inbounds'][iid]
-    values = {**ask_inbound_ports(ask, inbound['protocol'], inbound.get('settings')),
-              'public_host': ask('公网 IP 或域名')}
-    if inbound['protocol'] == 'reality':
-        values['handshake'], values['server_name'] = ask_reality_names(ask)
+def node_field(label, default=''):
+    value = ask(label + (f' [{default}]' if default else ''))
+    if value == '0':
+        raise Cancelled
+    return value or default
+
+
+def edit_node(manager, engine, adding=False):
+    nodes = manager.store.read()['inbounds']
+    iid = None if adding else select_record(nodes, '选择节点', 'inbounds')
+    inbound = nodes.get(iid, {})
+    print('回车使用默认值，0 取消')
+    if adding:
+        protocol = choose('选择协议', PROTOCOL_LABELS.items())
+        default = PROTOCOL_LABELS[protocol]
+        names = {node['name'] for node in nodes.values()}
+        number = 2
+        while default in names:
+            default = f'{PROTOCOL_LABELS[protocol]} {number}'
+            number += 1
+        name = node_field('节点名称', default)
     else:
-        values['server_name'] = ask('证书域名')
-        if inbound['protocol'] == 'cloudflare_ws':
-            existing = inbound.get('settings', {}).get('path')
-            values['path'] = ask(f'WebSocket 路径（回车保留 {existing}）' if existing else 'WebSocket 路径（回车自动生成）')
-    configure(manager, engine, iid, values)
-    message('节点已保存')
-    if inbound['protocol'] == 'cloudflare_ws':
+        name = inbound['name']
+        print('节点名称：' + name + '（不可修改）')
+        protocol = inbound['protocol']
+        print('协议：' + PROTOCOL_LABELS[protocol] + '（不可修改）')
+    previous = inbound.get('settings', {}) if protocol == inbound.get('protocol') else {}
+    values = {**previous, **ask_inbound_ports(node_field, protocol, previous),
+              'public_host': node_field('公网 IP 或域名', previous.get('public_host', ''))}
+    if protocol == 'reality':
+        values['handshake'] = node_field('REALITY 握手目标', previous.get('handshake', ''))
+        values['server_name'] = node_field('SNI', previous.get('server_name', values['handshake']))
+    else:
+        values['server_name'] = node_field('证书域名', previous.get('server_name', values['public_host']))
+        if protocol == 'cloudflare_ws':
+            values['path'] = node_field('WebSocket 路径' if previous.get('path') else 'WebSocket 路径（留空自动生成）',
+                                        previous.get('path', ''))
+    iid = configure(manager, engine, iid, values, name=name, protocol=protocol)
+    message('节点已添加' if adding else '节点已保存')
+    if protocol == 'cloudflare_ws':
         print('WebSocket 路径：' + manager.store.read()['inbounds'][iid]['settings']['path'])
-        message('路径变更后需重新导出客户端配置', tone='warning')
 
 
 def node_action(action, manager, engine):
     if action == 1:
         show_records(manager, 'inbounds')
-    elif action == 2:
-        protocol = choose('选择协议', PROTOCOL_LABELS.items())
-        manager.add_inbound(ask('节点名称'), protocol)
-        message('节点已添加，请设置地址和端口')
-    elif action == 3:
-        edit_node(manager, engine)
-    else:
+    elif action in (2, 3):
+        edit_node(manager, engine, adding=action == 2)
+    elif action == 4:
+        state = manager.store.read()
+        iid = select_record(state['inbounds'], '删除节点', 'inbounds')
+        count = sum(iid in user['grants'] for user in state['users'].values())
+        if confirm(f'删除节点「{state["inbounds"][iid]["name"]}」及 {count} 个用户的节点权限和对应出口绑定；旧连接失效。'):
+            manager.delete_inbound(iid)
+            message('节点已删除')
+    elif action == 5:
         from sbmanager.modules.initialization import wizard
         wizard(manager, engine, ask)
 

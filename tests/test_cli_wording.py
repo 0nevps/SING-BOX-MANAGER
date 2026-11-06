@@ -132,7 +132,7 @@ class CliWordingTests(unittest.TestCase):
         self.assertIn(other, self.store.read()['users'][self.user]['grants'])
 
     def test_add_node_uses_numbered_protocol_and_short_prompts(self):
-        output, prompts = self.run_menu(['1', '2', '2', 'new-node', '0', '0'])
+        output, prompts = self.run_menu(['1', '2', '2', 'new-node', '', 'node.example', '', '0', '0'])
         node = next(node for node in self.store.read()['inbounds'].values() if node['name'] == 'new-node')
         self.assertEqual('hysteria2', node['protocol'])
         self.assertIn('选择协议', output)

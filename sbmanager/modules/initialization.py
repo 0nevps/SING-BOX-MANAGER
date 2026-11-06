@@ -10,9 +10,9 @@ from sbmanager.security import credential, identifier, text, ValidationError
 def wizard(manager, engine, ask):
     state = manager.store.read()
     if state['inbounds'] or state['users']:
-        raise ValidationError('已有用户或节点，请在“节点管理 > 设置地址和端口”中修改；现有数据不会被覆盖')
+        raise ValidationError('已有用户或节点，请在“节点管理 > 修改节点”中修改；现有数据不会被覆盖')
     print('首次设置：仅创建选中的节点和一个用户。\n'
-          '1 REALITY\n2 Hysteria2\n3 WebSocket\n0 取消')
+          '1 VLESS + REALITY + Vision\n2 Hysteria2\n3 VLESS + WebSocket + TLS\n0 取消')
     while True:
         choices = ask('选择要安装的节点（可多选，用空格或逗号分隔，如 1 3；0 取消）').replace(',', ' ').split()
         if choices == ['0']:

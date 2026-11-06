@@ -1,8 +1,11 @@
 import ipaddress
 import re
 import secrets
-from sbmanager.security import ValidationError, text
+from sbmanager.security import ValidationError, text, identifier
 from sbmanager.system.network import check_reality_target
+
+PROTOCOL_LABELS = {'reality': 'VLESS + REALITY + Vision', 'hysteria2': 'Hysteria2',
+                   'cloudflare_ws': 'VLESS + WebSocket + TLS'}
 
 
 def host(value):
@@ -35,9 +38,8 @@ def ask_inbound_ports(ask, protocol, previous=None):
         if choice != '2':
             raise ValidationError('请选择 1 或 2')
 
-    labels = {'reality': ('REALITY', 'TCP', 443), 'hysteria2': ('Hysteria2', 'UDP', 443),
-              'cloudflare_ws': ('WebSocket', 'TCP', 8443)}
-    label, transport, default = labels[protocol]
+    label = PROTOCOL_LABELS[protocol]
+    transport, default = ('UDP', 443) if protocol == 'hysteria2' else ('TCP', 8443 if protocol == 'cloudflare_ws' else 443)
     mode = 'direct'
     if protocol == 'cloudflare_ws':
         current_mode = previous.get('connection_mode')
@@ -58,17 +60,23 @@ def ask_inbound_ports(ask, protocol, previous=None):
     public_port = 443 if mode == 'cloudflare' else port
     if mode == 'cloudflare':
         print(f'客户端端口：443；VPS 端口：{port}。\n请手动设置 Cloudflare 回源端口为 {port}。')
-    else:
-        print(f'{label}：手机/电脑连接时也使用 {port} 端口。')
     result = {'port': port, 'public_port': public_port}
     if protocol == 'cloudflare_ws':
         result['connection_mode'] = mode
     return result
 
 
-def configure(manager, engine, inbound_id, values):
+def configure(manager, engine, inbound_id, values, *, name=None, protocol=None):
     values = dict(values)
-    inbound = manager.store.read()['inbounds'][inbound_id]
+    previous_node = manager.store.read()['inbounds'].get(inbound_id) if inbound_id else None
+    if inbound_id and previous_node is None:
+        raise ValidationError('节点已删除，请重新选择')
+    inbound = previous_node or {'id': identifier(), 'name': text(name, '节点名称'), 'protocol': protocol}
+    protocol = protocol or inbound['protocol']
+    if protocol not in PROTOCOL_LABELS:
+        raise ValidationError('不支持的节点协议')
+    if protocol != inbound['protocol']:
+        raise ValidationError('节点协议不可修改')
     if inbound['protocol'] == 'reality':
         values['server_name'] = values.get('server_name') or values['handshake']
     for field in ('server_name', 'public_host'):
@@ -89,8 +97,14 @@ def configure(manager, engine, inbound_id, values):
     elif inbound['protocol'] == 'cloudflare_ws':
         values['path'] = websocket_path(values.get('path'), inbound.get('settings', {}).get('path'))
     def change(state):
-        state['inbounds'][inbound_id]['settings'] = values
-    manager.store.update(change)
+        if previous_node is not None:
+            if state['inbounds'].get(inbound_id) != previous_node:
+                raise ValidationError('节点已被其他操作修改，请重新选择')
+        elif any(node['name'] == inbound['name'] for node in state['inbounds'].values()):
+            raise ValidationError('节点名称已存在')
+        state['inbounds'][inbound['id']] = {**inbound, 'settings': values}
+        return inbound['id']
+    return manager.store.update(change)
 
 
 def ask_reality_names(ask):
