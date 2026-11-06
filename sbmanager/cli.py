@@ -243,7 +243,19 @@ def edit_node(manager, engine, adding=False):
     iid = configure(manager, engine, iid, values, name=name, protocol=protocol)
     message('节点已添加' if adding else '节点已保存')
     if protocol == 'cloudflare_ws':
-        print('WebSocket 路径：' + manager.store.read()['inbounds'][iid]['settings']['path'])
+        settings = manager.store.read()['inbounds'][iid]['settings']
+        print('WebSocket 路径：' + settings['path'])
+        if settings.get('connection_mode') == 'cloudflare':
+            print('\nCloudflare 配置（需手动设置，程序不会自动修改）：')
+            print('保持橙云开启，在 Origin Rules（回源规则）中使用以下匹配表达式：')
+            print(f'(http.host eq "{settings["server_name"]}" and not starts_with('
+                  'http.request.uri.path, "/.well-known/acme-challenge/"))')
+            print(f'Rewrite port（回源端口）：{settings["port"]}')
+            print('证书验证路径 /.well-known/acme-challenge/ 不要强制跳转 HTTPS，'
+                  '也不要被其他规则改写到节点端口。')
+            print('请在 VPS 防火墙和云安全组长期允许公网 TCP 80 到达源站；'
+                  '申请和自动续期均需要。')
+            print('验证期间由 sing-box 临时监听 TCP 80，不要另开服务占用该端口。')
 
 
 def node_action(action, manager, engine):

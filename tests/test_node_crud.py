@@ -20,8 +20,45 @@ class NodeCrudTests(unittest.TestCase):
         self.engine.keypair.return_value = ('private', 'public')
 
     def action(self, number, answers):
-        with patch('builtins.input', side_effect=answers), contextlib.redirect_stdout(io.StringIO()):
+        output = io.StringIO()
+        with patch('builtins.input', side_effect=answers), contextlib.redirect_stdout(output):
             node_action(number, self.manager, self.engine)
+        return output.getvalue()
+
+    def test_cloudflare_add_and_edit_show_domain_specific_acme_rule(self):
+        output = self.action(2, ['3', '', '1', '', 'public.example', 'cert.example', ''])
+        for domain, port, result in [('cert.example', 8443, output),
+                                     ('new.example', 9443, None)]:
+            if result is None:
+                result = self.action(3, ['1', '', str(port), '', domain, ''])
+            self.assertIn(f'(http.host eq "{domain}" and not starts_with('
+                          'http.request.uri.path, "/.well-known/acme-challenge/"))', result)
+            self.assertIn(f'Rewrite port（回源端口）：{port}', result)
+            self.assertIn('橙云', result)
+            self.assertIn('不要强制跳转 HTTPS', result)
+            self.assertIn('公网 TCP 80', result)
+            self.assertIn('续期', result)
+        node = next(iter(self.store.read()['inbounds'].values()))
+        self.assertEqual('public.example', node['settings']['public_host'])
+        self.assertEqual('new.example', node['settings']['server_name'])
+        self.assertEqual(9443, node['settings']['port'])
+        self.assertEqual(443, node['settings']['public_port'])
+
+    def test_direct_nodes_do_not_show_cloudflare_rule(self):
+        for answers in (['3', '', '2', '', 'direct.example', '', ''],
+                        ['2', '', '', 'hy.example', '']):
+            with self.subTest(answers=answers):
+                output = self.action(2, answers)
+                self.assertNotIn('http.host eq', output)
+                self.assertNotIn('Rewrite port', output)
+
+    def test_switching_websocket_to_direct_hides_cloudflare_rule(self):
+        self.action(2, ['3', '', '1', '', 'node.example', '', ''])
+        output = self.action(3, ['1', '2', '', '', '', ''])
+        self.assertNotIn('http.host eq', output)
+        self.assertNotIn('Rewrite port', output)
+        node = next(iter(self.store.read()['inbounds'].values()))
+        self.assertEqual('direct', node['settings']['connection_mode'])
 
     def test_complete_add_defaults_and_edit_preserves_name_and_values(self):
         self.action(2, ['2', '', '', 'node.example', ''])
