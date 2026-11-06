@@ -150,7 +150,7 @@ def user_node(manager, granted=True):
 
 
 def confirm(warning):
-    return ask(warning + '\n输入 yes 确认，其他输入取消', tone='warning') == 'yes'
+    return ask(warning + '\n确认？[y/N]（y 确认，n 或回车取消）', tone='warning').lower() == 'y'
 
 
 def show_records(manager, kind):
@@ -300,7 +300,7 @@ def edit_egress(manager, profile=None):
     default = link_name or (profile['name'] if profile else protocol.upper())
     name = ask(f'出口名称（回车使用 {default}）') or default
     if protocol != 'http':
-        settings['udp'] = ask('支持 UDP？（yes 支持，回车阻止）') == 'yes'
+        settings['udp'] = ask('支持 UDP？[y/N]（y 支持，n 或回车阻止）').lower() == 'y'
     manager.save_egress(name, protocol, settings, profile['id'] if profile else None)
 
 

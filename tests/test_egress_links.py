@@ -74,7 +74,7 @@ class EgressLinkTests(unittest.TestCase):
         key, profile = next(iter(self.manager.store.read()['egress'].items()))
         self.assertEqual('入口', profile['name'])
         with patch('sbmanager.cli.getpass.getpass', return_value='ss://' + b64('aes-128-gcm:secret') + '@host:8388'), \
-                patch('builtins.input', side_effect=['1', '', 'yes']), contextlib.redirect_stdout(io.StringIO()):
+                patch('builtins.input', side_effect=['1', '', 'y']), contextlib.redirect_stdout(io.StringIO()):
             egress_action(5, self.manager)
         profile = self.manager.store.read()['egress'][key]
         self.assertEqual('ss', profile['protocol'])

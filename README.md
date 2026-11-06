@@ -18,7 +18,7 @@
 curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
-更新时选择“4 服务管理 → 6 更新管理程序”，或重新运行相同安装命令，即可获取 `main` 最新代码，保留数据和配置。不需要指定版本，也不依赖本项目的 tag 或 Release。彻底删除本工具时，选择“4 服务管理 → 7 卸载全部”，核对删除范围后输入 `yes`。
+更新时选择“4 服务管理 → 6 更新管理程序”，或重新运行相同安装命令，即可获取 `main` 最新代码，保留数据和配置。不需要指定版本，也不依赖本项目的 tag 或 Release。彻底删除本工具时，选择“4 服务管理 → 7 卸载全部”，核对删除范围后输入 `y`。
 
 安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。执行前请先阅读[安装与升级](docs/INSTALLATION.md)，检查安装脚本和 `main` 源码。
 

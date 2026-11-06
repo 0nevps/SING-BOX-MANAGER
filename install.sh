@@ -110,8 +110,8 @@ if p.exists() and json.loads(p.read_text()).get('schema_version') != 1:
 CHECK_STATE
 if [[ -n "$old" ]]; then
     [[ -r /dev/tty ]] || { echo '升级需要在终端中输入确认，请通过 SSH 登录 VPS 后重新运行安装命令' >&2; exit 1; }
-    read -r -p "更新至 main 提交 ${commit:0:12} 会替换程序；服务运行时会重启，连接可能短暂中断。确认请输入 yes，其他输入取消: " answer </dev/tty
-    [[ "$answer" == yes ]] || exit 0
+    read -r -p "更新至 main 提交 ${commit:0:12} 会替换程序；服务运行时会重启，连接可能短暂中断。确认？[y/N]（y 确认，n 或回车取消）: " answer </dev/tty
+    [[ "$answer" == [yY] ]] || exit 0
 fi
 # Do not run package installation concurrently with manager mutations.
 exec 8>/var/lib/sbmanager/state.lock

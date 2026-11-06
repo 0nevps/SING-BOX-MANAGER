@@ -62,7 +62,7 @@ class CliWordingTests(unittest.TestCase):
 
     def test_reset_requires_confirmation_and_invalidates_old_credential(self):
         before = self.store.read()['users'][self.user]['grants'][self.node]
-        _, prompts = self.run_menu(['2', '7', '1', '1', 'no', '7', '1', '1', 'yes', '0', '0'])
+        _, prompts = self.run_menu(['2', '7', '1', '1', 'no', '7', '1', '1', 'y', '0', '0'])
         self.assertIn('旧连接密钥将失效', prompts)
         self.assertIn('节点管理 > 查看节点', prompts)
         self.assertIn('获取新分享链接并更新客户端', prompts)
@@ -216,10 +216,10 @@ class CliWordingTests(unittest.TestCase):
         self.manager.bind(self.user, self.node, egress)
         self.run_menu(['2', '6', '1', '1', 'no', '0', '0'])
         self.assertIn(self.node, self.store.read()['users'][self.user]['grants'])
-        self.run_menu(['2', '6', '1', '1', 'yes', '0', '0'])
+        self.run_menu(['2', '6', '1', '1', 'y', '0', '0'])
         self.assertEqual({}, self.store.read()['bindings'])
         self.assertEqual({}, self.store.read()['users'][self.user]['grants'])
-        self.run_menu(['2', '8', '1', 'yes', '0', '0'])
+        self.run_menu(['2', '8', '1', 'y', '0', '0'])
         self.assertEqual({}, self.store.read()['users'])
 
     def test_egress_creation_edit_test_and_deletion(self):
@@ -227,7 +227,7 @@ class CliWordingTests(unittest.TestCase):
                 'socks5://user:hidden@proxy.example.com:1080',
                 'socks5://user:hidden@other.example.com:1081']):
             self.run_menu(['3', '2', 'proxy', '', '0', '0'])
-            self.run_menu(['3', '5', '1', 'updated', 'yes', '0', '0'])
+            self.run_menu(['3', '5', '1', 'updated', 'y', '0', '0'])
         profile = next(iter(self.store.read()['egress'].values()))
         self.assertEqual('updated', profile['name'])
         self.assertEqual('other.example.com', profile['settings']['server'])
@@ -237,7 +237,7 @@ class CliWordingTests(unittest.TestCase):
             output, _ = self.run_menu(['3', '4', '1', '0', '0'])
             driver.return_value.test_connection.assert_called_once_with(profile)
         self.assertIn('未验证 UDP', output)
-        self.run_menu(['3', '7', '1', 'yes', '0', '0'])
+        self.run_menu(['3', '7', '1', 'y', '0', '0'])
         self.assertEqual({}, self.store.read()['egress'])
 
     def test_service_and_backup_actions_reach_existing_operations(self):
@@ -247,7 +247,7 @@ class CliWordingTests(unittest.TestCase):
         deployment.backups.mkdir()
         (deployment.backups / 'old.json').touch()
         output, _ = self.run_menu(['4', '1', '2', '3', '0',
-                                   '5', '1', '2', '3', '1', 'yes', '4', '2', 'yes', '0', '0'], deployment)
+                                   '5', '1', '2', '3', '1', 'y', '4', '2', 'y', '0', '0'], deployment)
         deployment.service.logs.assert_called_once()
         deployment.backup.assert_called_once()
         deployment.restore.assert_called_once_with('old.json')

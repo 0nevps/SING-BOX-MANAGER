@@ -61,7 +61,7 @@ class NodeCrudTests(unittest.TestCase):
         before = self.store.read()
         self.action(4, ['1', 'no'])
         self.assertEqual(before, self.store.read())
-        self.action(4, ['1', 'yes'])
+        self.action(4, ['1', 'y'])
         state = self.store.read()
         self.assertNotIn(iid, state['inbounds'])
         self.assertEqual({other}, set(state['users'][uid]['grants']))

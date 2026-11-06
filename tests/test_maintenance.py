@@ -206,13 +206,13 @@ class MaintenanceMenuTests(unittest.TestCase):
 
     def test_uninstall_success_exits_without_reopening_menu(self):
         with patch.object(maintenance, 'uninstall') as uninstall:
-            output, _ = self.menu(['4', '7', 'yes'])
+            output, _ = self.menu(['4', '7', 'y'])
         uninstall.assert_called_once_with()
         self.assertIn('已卸载', output)
         self.assertEqual(1, output.count('主菜单'))
 
     def test_uninstall_failure_is_not_reported_as_success(self):
         with patch.object(maintenance, 'uninstall', side_effect=OSError('stop failed')):
-            output, _ = self.menu(['4', '7', 'yes', '0', '0'])
+            output, _ = self.menu(['4', '7', 'y', '0', '0'])
         self.assertIn('操作未完成', output)
         self.assertNotIn('已卸载', output)
