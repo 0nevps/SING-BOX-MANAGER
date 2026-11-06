@@ -18,19 +18,32 @@ def public_addresses():
     return result
 
 
+def inbound_listeners(config):
+    """Yield transport, bind address and port for each configured listener."""
+    for inbound in config['inbounds']:
+        if inbound['type'] == 'direct':
+            protocols = (inbound['network'],) if inbound.get('network') else ('tcp', 'udp')
+        else:
+            protocols = ('udp',) if inbound['type'] == 'hysteria2' else ('tcp',)
+        for protocol in protocols:
+            yield protocol, inbound.get('listen', '::'), inbound['listen_port']
+
+
 def check_available(config):
     """Local bind checks only. Internet reachability still requires an external probe."""
-    listeners = [(i['listen_port'], socket.SOCK_DGRAM if i['type'] == 'hysteria2' else socket.SOCK_STREAM)
-                 for i in config['inbounds']]
-    if any(i['tls'].get('certificate_provider') for i in config['inbounds']):
-        listeners.append((80, socket.SOCK_STREAM))
-    for port, kind in listeners:
-        with socket.socket(socket.AF_INET6, kind) as sock:
-            try:
-                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-                sock.bind(('::', port))
-            except OSError:
-                raise ValidationError(f'无法使用端口 {port}，可能已被其他程序占用或当前权限不足。请检查端口占用、root 权限和系统网络设置') from None
+    listeners = list(inbound_listeners(config))
+    if any(i.get('tls', {}).get('certificate_provider') for i in config['inbounds']):
+        listeners.append(('tcp', '::', 80))
+    for protocol, address, port in listeners:
+        kind = socket.SOCK_DGRAM if protocol == 'udp' else socket.SOCK_STREAM
+        family = socket.AF_INET6 if ipaddress.ip_address(address).version == 6 else socket.AF_INET
+        try:
+            with socket.socket(family, kind) as sock:
+                if family == socket.AF_INET6:
+                    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                sock.bind((address, port))
+        except OSError:
+            raise ValidationError(f'无法使用端口 {port}，可能已被其他程序占用或当前权限不足。请检查端口占用、root 权限和系统网络设置') from None
 
 
 def check_reality_target(target, server_name, port=443, timeout=5):

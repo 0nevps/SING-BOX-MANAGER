@@ -15,6 +15,21 @@ class Manager:
     def __init__(self, store):
         self.store = store
 
+    def add_forward(self, values):
+        from sbmanager.core.forwarding import validate_forward
+        entry = {**validate_forward(values), 'id': identifier()}
+        def change(state):
+            state.setdefault('forwards', {})[entry['id']] = entry
+            return entry['id']
+        return self.store.update(change)
+
+    def delete_forward(self, forward_id):
+        def change(state):
+            records = state.get('forwards', {})
+            require(records, forward_id, '端口转发')
+            del records[forward_id]
+        self.store.update(change)
+
     def add_inbound(self, name, protocol):
         if protocol not in PROTOCOLS:
             raise ValidationError('节点协议不支持。请输入 reality、hysteria2 或 cloudflare_ws')

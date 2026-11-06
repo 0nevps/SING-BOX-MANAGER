@@ -10,7 +10,9 @@ def validate_state(state):
     for name in ('users', 'inbounds', 'egress', 'bindings'):
         if not isinstance(state.get(name), dict):
             raise ValidationError(f'保存的数据格式不正确（字段 {name}）。请保留原文件，使用有效备份恢复，不要手动删除数据')
+    from sbmanager.core.forwarding import validate_forwards
     try:
+        validate_forwards(state)
         names = set()
         for key, user in state['users'].items():
             if user['id'] != key or type(user['enabled']) is not bool or not isinstance(user['grants'], dict):
@@ -38,5 +40,7 @@ def validate_state(state):
                 raise ValueError()
             if binding['active'] is not None and binding['active'] not in saved:
                 raise ValueError()
+    except ValidationError:
+        raise
     except (KeyError, TypeError, ValueError):
         raise ValidationError('保存的用户、节点或出口数据不完整，或对应关系不正确；未修改文件。请保留原文件，使用有效备份恢复') from None

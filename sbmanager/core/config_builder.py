@@ -63,6 +63,10 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
             if protocol == 'cloudflare_ws':
                 node['transport'] = {'type': 'ws', 'path': settings['path']}
         config['inbounds'].append(node)
-    if not config['inbounds']:
-        raise ValidationError('还没有可用的节点设置。请到“节点管理 > 添加节点”完成设置')
+    from sbmanager.core.forwarding import build_forwards
+    for node in build_forwards(state):
+        config['inbounds'].append(node)
+        config['route']['rules'].append({'inbound': [node['tag']], 'action': 'route', 'outbound': 'direct'})
+    if not config['inbounds'] and not (state.get('deployed') and 'forwards' in state):
+        raise ValidationError('还没有可用的节点或端口转发。请先添加节点或端口转发规则')
     return config

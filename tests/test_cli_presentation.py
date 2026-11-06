@@ -24,12 +24,12 @@ class CliPresentationTests(unittest.TestCase):
             self.assertEqual(0, run(manager, Mock(), Mock()))
         return output.getvalue(), '\n'.join(call.args[0] for call in reader.call_args_list)
 
-    def test_main_menu_has_only_six_categories_and_exit(self):
+    def test_main_menu_has_seven_categories_and_exit(self):
         output, _ = self.run_menu(['0'])
         options = re.findall(r'^ +(\d+) (.+)$', output, re.MULTILINE)
-        self.assertEqual([str(number) for number in (1, 2, 3, 4, 5, 6, 0)],
+        self.assertEqual([str(number) for number in (1, 2, 3, 4, 5, 6, 7, 0)],
                          [number for number, _ in options])
-        for title in ('节点管理', '用户管理', '出口管理', '服务管理', '备份与恢复', '高级与帮助'):
+        for title in ('节点管理', '用户管理', '出口管理', '服务管理', '备份与恢复', '高级与帮助', '端口转发'):
             self.assertIn(title, output)
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)

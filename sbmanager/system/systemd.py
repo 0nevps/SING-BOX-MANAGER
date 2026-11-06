@@ -1,5 +1,7 @@
+import ipaddress
 import json
 import socket
+from sbmanager.system.network import inbound_listeners
 import subprocess
 import time
 from sbmanager.security import ValidationError
@@ -30,11 +32,18 @@ class Systemd:
                     fields = line.split()
                     if len(fields) >= 5:
                         try:
-                            listeners.add((fields[0], int(fields[4].rsplit(':', 1)[1])))
+                            address, port = fields[4].rsplit(':', 1)
+                            address = address.strip('[]')
+                            if address != '*':
+                                address = str(ipaddress.ip_address(address))
+                            listeners.add((fields[0], address, int(port)))
                         except ValueError:
                             pass
-                needed = {('udp' if i['type'] == 'hysteria2' else 'tcp', i['listen_port']) for i in config['inbounds']}
-                if needed <= listeners:
+                needed = set(inbound_listeners(config))
+                if all((protocol, str(ipaddress.ip_address(address)), port) in listeners
+                       or (ipaddress.ip_address(address).is_unspecified
+                           and (protocol, '*', port) in listeners)
+                       for protocol, address, port in needed):
                     return
             time.sleep(1)
         raise ValidationError('服务未正常运行，或节点端口未就绪。请到“服务管理 > 查看日志”排查，并检查端口占用')

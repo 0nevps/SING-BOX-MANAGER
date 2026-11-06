@@ -32,8 +32,9 @@ MENUS = (
                   '更新管理程序', '卸载全部')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
     ('高级与帮助', ('查看原始设置 JSON',)),
+    ('端口转发', ('查看转发', '添加转发', '删除转发')),
 )
-DANGEROUS = {'删除节点', '删除用户', '删除出口', '卸载全部'}
+DANGEROUS = {'删除节点', '删除用户', '删除出口', '删除转发', '卸载全部'}
 CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序'}
 
 
@@ -341,6 +342,37 @@ def egress_action(action, manager):
             message('出口已删除')
 
 
+def forward_action(action, manager):
+    records = manager.store.read().get('forwards', {})
+    if action == 1:
+        if not records:
+            message('暂无端口转发', tone='warning')
+        for record in records.values():
+            network = 'TCP + UDP' if record['network'] == 'both' else record['network'].upper()
+            print(f'{record["name"]} · {network} · [{record["listen"]}]:{record["listen_port"]}'
+                  f' 转发到 [{record["target"]}]:{record["target_port"]} · 直连')
+    elif action == 2:
+        print('回车使用默认值，0 取消。监听公网地址会开放转发端口；请自行配置防火墙。')
+        name = node_field('转发名称', '端口转发')
+        listen = node_field('监听 IP', '0.0.0.0')
+        port = int(node_field('监听端口'))
+        target = node_field('目标 IP 或域名')
+        target_port = int(node_field('目标端口'))
+        choice = node_field('协议：1 TCP + UDP，2 TCP，3 UDP', '1')
+        if choice not in ('1', '2', '3'):
+            raise ValueError('请选择 1、2 或 3')
+        manager.add_forward({'name': name, 'listen': listen, 'listen_port': port,
+                             'target': target, 'target_port': target_port,
+                             'network': {'1': 'both', '2': 'tcp', '3': 'udp'}[choice]})
+        message('转发已保存；首次使用请到“服务管理”检查配置并启动服务')
+    elif action == 3:
+        key = choose('删除转发', ((key, f'{r["name"]} · {r["network"]} · [{r["listen"]}]:{r["listen_port"]}')
+                                    for key, r in records.items()))
+        if confirm(f'删除转发「{records[key]["name"]}」，对应端口将停止转发。'):
+            manager.delete_forward(key)
+            message('转发已删除')
+
+
 def show_certificates(manager):
     result = inspect(manager.store.read(), manager.store.directory / 'acme')
     for domain in result['domains']:
@@ -448,6 +480,8 @@ def run(manager, engine, deployment):
                     return 0
             elif section == 5:
                 backup_action(action, manager, deployment)
+            elif section == 7:
+                forward_action(action, manager)
             else:
                 advanced_action(action, manager)
         except Cancelled:
