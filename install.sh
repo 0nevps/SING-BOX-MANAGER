@@ -27,33 +27,82 @@ open_menu() {
         echo '当前没有交互终端，未打开菜单。请通过 SSH 登录后运行 sudo sbmanager。'
     fi
 }
-if [[ -z "$version" ]]; then
-    fetch "https://api.github.com/repos/$repo/releases/latest" "$tmp/release.json"
-    version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$tmp/release.json")
-fi
-[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo '版本号格式不正确，请填写完整版本号，例如 v0.1.0' >&2; exit 1; }
-base="https://github.com/$repo/releases/download/$version"
-fetch "$base/sbmanager-$version.tar.gz" "$tmp/package.tar.gz"
-fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS"
-python3 - "$tmp" "$version" <<'PY'
-import hashlib,pathlib,sys,tarfile
-root=pathlib.Path(sys.argv[1]); name=f'sbmanager-{sys.argv[2]}.tar.gz'
-expected={line.split()[1]:line.split()[0] for line in (root/'SHA256SUMS').read_text().splitlines()}
-if hashlib.sha256((root/'package.tar.gz').read_bytes()).hexdigest()!=expected[name]:
-    raise SystemExit('安装包与 SHA-256 校验信息不一致，已停止安装。请检查下载来源和网络后重试')
-with tarfile.open(root/'package.tar.gz') as archive:
-    for member in archive.getmembers():
-        path=pathlib.PurePosixPath(member.name)
-        if path.is_absolute() or '..' in path.parts or not (member.isfile() or member.isdir()):
-            raise SystemExit('安装包包含不安全的文件路径或文件类型，已停止安装。请勿使用此安装包')
-    archive.extractall(root/'package')
-PY
-# Pin the engine to the version validated by this release.
+download_source() {
+    if [[ -z "$version" ]]; then
+        fetch "https://api.github.com/repos/$repo/git/matching-refs/tags/v" "$tmp/tags.json"
+        version=$(python3 -I - "$tmp/tags.json" <<'TAGS'
+import json, re, sys
+with open(sys.argv[1]) as stream:
+    refs = json.load(stream)
+versions = [ref['ref'].removeprefix('refs/tags/') for ref in refs
+            if re.fullmatch(r'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+', ref.get('ref', ''))]
+if not versions:
+    raise SystemExit('没有找到可安装的 tag，请先创建 v主版本.次版本.修订号 格式的 tag')
+print(max(versions, key=lambda value: tuple(map(int, value[1:].split('.')))))
+TAGS
+        )
+    fi
+    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'tag 格式不正确，请填写完整 tag，例如 v0.1.0' >&2; return 1; }
+    fetch "https://api.github.com/repos/$repo/git/ref/tags/$version" "$tmp/ref.json"
+    local object_type object_sha reference depth
+    for ((depth=0; depth<10; depth++)); do
+        reference=$(python3 -I - "$tmp/ref.json" <<'REFERENCE'
+import json, re, sys
+with open(sys.argv[1]) as stream:
+    obj = json.load(stream)['object']
+if obj.get('type') not in ('tag', 'commit') or not re.fullmatch(r'[0-9a-f]{40}', obj.get('sha', '')):
+    raise SystemExit('tag 未指向有效提交，已停止安装')
+print(obj['type'], obj['sha'])
+REFERENCE
+        )
+        read -r object_type object_sha <<<"$reference"
+        if [[ "$object_type" == commit ]]; then break; fi
+        fetch "https://api.github.com/repos/$repo/git/tags/$object_sha" "$tmp/ref.json"
+    done
+    [[ "$object_type" == commit ]] || { echo 'tag 引用层数过多，已停止安装' >&2; return 1; }
+    # Resolve once, then download the immutable commit rather than a movable tag.
+    fetch "https://codeload.github.com/$repo/tar.gz/$object_sha" "$tmp/package.tar.gz"
+    python3 -I - "$tmp" <<'SOURCE'
+import pathlib, shutil, sys, tarfile
+root = pathlib.Path(sys.argv[1])
+with tarfile.open(root / 'package.tar.gz') as archive:
+    members = archive.getmembers()
+    prefix = None
+    seen = set()
+    for member in members:
+        path = pathlib.PurePosixPath(member.name)
+        if (path.is_absolute() or '..' in path.parts or not path.parts
+                or not (member.isfile() or member.isdir()) or path in seen):
+            raise SystemExit('源码包包含不安全的文件路径或文件类型，已停止安装')
+        seen.add(path)
+        if prefix is None:
+            prefix = path.parts[0]
+        if path.parts[0] != prefix or (len(path.parts) == 1 and not member.isdir()):
+            raise SystemExit('源码包目录结构不正确，已停止安装')
+    files = {str(pathlib.PurePosixPath(member.name).relative_to(prefix))
+             for member in members if member.isfile()}
+    if not {'main.py', 'install.sh', 'sbmanager/app.py'} <= files:
+        raise SystemExit('源码包缺少必要程序文件，已停止安装')
+    destination = root / 'package'
+    destination.mkdir(mode=0o700)
+    for member in members:
+        relative = pathlib.PurePosixPath(member.name).relative_to(prefix)
+        target = destination / relative
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True, mode=0o700)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            with archive.extractfile(member) as source, target.open('xb') as output:
+                shutil.copyfileobj(source, output)
+SOURCE
+}
+download_source
+# Pin the engine independently of the manager's source tag.
 engine_version=1.14.4
 engine_name="sing-box-$engine_version-linux-$arch"
 fetch "https://github.com/SagerNet/sing-box/releases/download/v$engine_version/$engine_name.tar.gz" "$tmp/engine.tar.gz"
 fetch "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v$engine_version" "$tmp/engine-release.json"
-python3 - "$tmp" "$engine_name" <<'PY'
+python3 -I - "$tmp" "$engine_name" <<'PY'
 import hashlib,json,pathlib,sys,tarfile
 root=pathlib.Path(sys.argv[1]); name=sys.argv[2]
 assets=json.loads((root/"engine-release.json").read_text())["assets"]

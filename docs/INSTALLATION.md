@@ -1,26 +1,32 @@
 # 安装与升级
 
-**当前是开发预发布版，只用于独立测试机。** 真实 Linux 安装、systemd 服务、证书申请和客户端连接尚未完成验收，不要用于正式服务。
-
-## 在测试机上安装
+## 安装
 
 使用 Debian 12/13 或 Ubuntu 22.04/24.04，并确保系统使用 systemd。安装需要 root 权限，会修改系统软件包、systemd 和 `/opt/sbmanager` 等目录。
 
-执行前，请先检查仓库中的安装脚本和发布文件。确认后，在测试机运行：
+执行前，请先检查仓库中的安装脚本和目标 tag 的源码。确认后运行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
-安装器会下载 GitHub Release 中的压缩包和 SHA-256 校验文件，检查下载文件是否一致。`v0.1.0` 是预发布版，必须明确写出版本号。安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复安装同一版本完成检查后也会尝试打开主菜单。
+安装脚本的参数是 `OWNER/REPOSITORY` 和可选的 `vMAJOR.MINOR.PATCH` tag。需要指定版本时，可在命令末尾追加 tag，例如：
 
-安装脚本的参数是 `OWNER/REPOSITORY` 和可选的 `v版本`。不指定版本时，会通过 GitHub API 选择最新稳定 Release，不会自动选择预发布版。安装脚本本身应来自已经审核的标签或提交。
+```bash
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
+```
 
-安装器会准备 Python、curl、CA 证书、tar、iproute2 和 flock。sing-box 固定使用 1.14.4，并按官方 GitHub 发布文件的摘要进行校验；固定版本不代表已完成 Linux 实测。下载失败、缺少摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
+脚本使用 `main` 分支中的安装逻辑；指定 tag 只决定下载哪个版本的源码，不表示历史 tag 已包含后续改动。请在执行前检查当前脚本。
+
+本项目只使用 Git tag 标记版本，不创建 GitHub Release，也不提供发布附件或 `SHA256SUMS`。不指定 tag 时，安装器通过 GitHub `git/matching-refs/tags/v` API 获取候选项，选择符合 `vMAJOR.MINOR.PATCH` 格式且语义版本最高的 tag，而不是按创建时间选择。轻量 tag 和附注 tag 都会解析到 commit，再通过 HTTPS 从 `codeload.github.com/OWNER/REPO/tar.gz/COMMIT` 下载源码，安全检查后解压。
+
+安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复安装同一版本完成检查后也会尝试打开主菜单。
+
+安装器会准备 Python、curl、CA 证书、tar、iproute2 和 flock。sing-box 固定使用 1.14.4，兼容范围为 1.14.x；仍从 sing-box 官方 GitHub Release 下载，并按官方发布文件的摘要进行校验，这与本项目不创建 GitHub Release 无关。下载失败、缺少官方摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
 
 ## 安装后文件放在哪里
 
-- `/opt/sbmanager/releases/`：按版本保存管理程序和 sing-box。
+- `/opt/sbmanager/releases/`：按版本保存管理程序和 sing-box 的本地目录，保留此路径以兼容已有安装，与 GitHub Release 无关。
 - `/opt/sbmanager/current`：指向当前使用的程序版本。
 - `/usr/local/bin/sbmanager`：运行 `sbmanager` 时使用的命令入口。
 - `/var/lib/sbmanager/`：用户、节点和出口等管理数据，以及恢复记录、备份和 ACME 证书缓存。
@@ -48,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/inst
 - Hysteria2 默认使用 UDP 443，手机或电脑连接同一个端口。
 - WebSocket 先选择直接连接 VPS，还是经过 Cloudflare 代理，再填写 VPS 端口，默认 TCP 8443。直接连接 VPS 时，客户端使用同一个端口；经过 Cloudflare 时，客户端连接 HTTPS 443，你需要自行在 Cloudflare 设置回源到 VPS 所填端口的规则。
 
-使用 HTTP-01 申请证书时，域名解析必须正确，公网 TCP 80 必须能到达 VPS 源站。DNS 解析成功或本机端口检查通过，都不能证明公网访问正常。程序不会自动设置 Cloudflare，V1 也不支持 DNS-01。
+使用 HTTP-01 申请证书时，域名解析必须正确，公网 TCP 80 必须能到达 VPS 源站。DNS 解析成功或本机端口检查通过，都不能证明公网访问正常。程序不会自动设置 Cloudflare，也不支持 DNS-01。
 
 保存后，选择“4 服务管理 → 2 检查配置并启动服务”。**安装完成、设置已保存或服务检查通过，都不代表客户端一定能连接。** 仍需通过“4 服务管理 → 4 检查证书”和“4 服务管理 → 3 查看日志”排查，并在手机或电脑上实际测试。
 
@@ -60,9 +66,9 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/inst
 
 升级失败时，安装器会尝试恢复旧程序和原有服务设置。请检查服务状态和提示中的备份位置，不要把“尝试恢复”当作恢复成功的保证。
 
-只升级 sing-box 时，使用“4 服务管理 → 5 升级sing-box”，填写明确的 1.14.x 稳定版本。系统模式下才能执行此操作；升级后的运行情况仍需检查。
+只升级 sing-box 时，使用“4 服务管理 → 5 升级sing-box”，填写明确的 1.14.x 版本。系统模式下才能执行此操作；升级后的运行情况仍需检查。
 
-## 本地开发或预览
+## 本地开发
 
 需要 Python 3.10+，支持 macOS/Linux，不需要第三方 Python 包：
 
@@ -72,12 +78,4 @@ python3 -m unittest discover -s tests -v
 bash -n install.sh
 ```
 
-本地模式只保存管理数据，不启动 systemd，也不应用系统服务配置。可通过 `--sing-box /path/to/sing-box` 指定 1.14.x 程序文件，使用首次设置、节点配置和导出等相关功能；需要调用 sing-box 的功能仍要求该文件可执行。本地运行不能代替 Linux 部署验收。
-
-## 为 GitHub 发布打包（维护者使用）
-
-```bash
-python3 scripts/package.py v0.1.0
-```
-
-生成的文件是 `dist/sbmanager-v0.1.0.tar.gz` 和 `dist/SHA256SUMS`。GitHub 标签工作流会运行测试并创建预发布版 Release。完成[验证记录](VALIDATION.md)中的 Linux 验收后，才能将其作为稳定版宣传。
+本地模式只保存管理数据，不启动 systemd，也不应用系统服务配置。可通过 `--sing-box /path/to/sing-box` 指定 1.14.x 程序文件，使用首次设置、节点配置和导出等相关功能；需要调用 sing-box 的功能仍要求该文件可执行。本地运行不能代替 Linux 上的安装、服务和客户端连接测试。

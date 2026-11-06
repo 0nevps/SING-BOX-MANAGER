@@ -2,7 +2,7 @@
 
 ## Project structure & module organization
 
-The project has an implementation awaiting Linux acceptance. The local, Git-ignored `Sing-Box Manager.md` contains the V1 requirements; public contributors should use `README.md` and `docs/VALIDATION.md` for published scope and outstanding checks. CLI, configuration, deployment recovery, exports, installation, and tests exist.
+Use `README.md`, `docs/INSTALLATION.md`, and `docs/USER_GUIDE.md` for project scope, installation, and usage. CLI, configuration, deployment recovery, exports, installation, and tests exist.
 
 Current and planned layout:
 
@@ -16,7 +16,7 @@ Current and planned layout:
 
 ## Build, test, and development commands
 
-Run the current preview and tests with Python 3. Validate installer syntax without executing it:
+Run the CLI and tests with Python 3. Validate installer syntax without executing it:
 
 - `bash -n install.sh`: check installer syntax without executing it.
 - `python3 main.py`: launch the CLI on a supported Linux host.
@@ -37,10 +37,14 @@ Tests use `unittest`; no coverage threshold is configured. Name files `test_*.py
 
 ## Commit & pull request guidelines
 
-No Git history is available to establish conventions. Write concise English imperative commit subjects, such as `Add release installer`. PRs should link relevant issues or requirements, explain behavior changes, and include validation results and sanitized CLI transcripts when useful.
+No Git history is available to establish conventions. Write concise English imperative commit subjects, such as `fix: install from Git tags`. PRs should link relevant issues or requirements, explain behavior changes, and include validation results and sanitized CLI transcripts when useful.
 
-## Release & security requirements
+## Versioning & security requirements
 
-After Linux acceptance, publish versioned GitHub Releases with SHA-256 checksums. Document a real installation URL only after verification. Installation must prepare dependencies automatically and expose `sbmanager`; upgrades must preserve data and support rollback.
+Version this project with Git tags only; do not create GitHub Releases or project release attachments. The installer accepts an optional `vMAJOR.MINOR.PATCH` tag. Without one, select the highest semantic version from GitHub's `git/matching-refs/tags/v` API. Resolve lightweight and annotated tags to commits, download source over HTTPS from `codeload.github.com/OWNER/REPO/tar.gz/COMMIT`, and validate archive contents before extraction. Do not require project `SHA256SUMS` files or local release packaging.
+
+Installation commands should fetch `install.sh` from `main`, even when selecting a source tag such as `v0.1.0`; historical tags do not necessarily contain later installer changes. Continue downloading sing-box from its official GitHub Releases and verifying official digests. Keep compatibility with the local `/opt/sbmanager/releases/` directory; its name does not imply GitHub Releases. The supported sing-box range is 1.14.x.
+
+Installation must prepare dependencies automatically and expose `sbmanager`; upgrades must preserve data and support rollback. Open the main menu after installation when an interactive terminal is available; let users select nodes explicitly instead of configuring all nodes by default. Do not describe unverified behavior as verified.
 
 Protect sensitive files with `0600` and directories with `0700`. Never commit credentials or log complete sharing links. Validate before applying configurations, block unsupported UDP, and delegate ACME to sing-box.

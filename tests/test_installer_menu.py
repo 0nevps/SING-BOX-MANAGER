@@ -9,7 +9,7 @@ class InstallerMenuTests(unittest.TestCase):
     def setUp(self):
         self.source = (Path(__file__).resolve().parents[1] / 'install.sh').read_text()
         start = self.source.index('open_menu() {')
-        end = self.source.index('\nif [[ -z "$version" ]]', start)
+        end = self.source.index('\ndownload_source() {', start)
         self.function = self.source[start:end]
 
     def test_menu_uses_terminal_and_releases_installation_locks(self):

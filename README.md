@@ -2,8 +2,6 @@
 
 这是一个在 Linux VPS 上管理 sing-box 服务端的工具。你可以在终端里按菜单操作，管理节点、用户、出口、证书和配置。
 
-> **当前状态：开发预发布版，仍需在 Linux 上测试验收。** 代码已包含中文菜单、首次设置、用户权限、出口切换、三种节点配置、配置应用与失败恢复、客户端配置导出、证书检查、备份和 sing-box 升级。真实 systemd 服务、ACME 证书申请和客户端连接尚未完成验证。请只在独立测试机上使用，不要用于正式服务。
-
 ## 先认识几个词
 
 - **节点（手机或电脑连接的入口）**：例如 REALITY、Hysteria2 或 WebSocket 节点。
@@ -14,18 +12,20 @@
 
 ## 安装与使用
 
-预发布版通过 GitHub Release 提供安装包，并附带 SHA-256 校验文件，用于检查下载文件是否一致。在独立的 Debian/Ubuntu 测试机上安装 v0.1.0：
+本项目使用 Git tag 标记版本，不创建 GitHub Release 或发布附件。安装器通过 GitHub API 选择 tag 并解析到 commit，再从 GitHub 下载对应源码。在 Debian/Ubuntu 上安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
-安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。执行前请先阅读[安装与升级](docs/INSTALLATION.md)及[待完成验收](docs/VALIDATION.md)，检查安装脚本和发布文件。不指定版本时，安装器只选择 GitHub 最新的稳定版；安装预发布版必须写明版本号。
+可在命令末尾附加明确的 `vMAJOR.MINOR.PATCH` tag，例如 `v0.1.0`；不指定时选择语义版本最高的 tag。脚本从 `main` 分支获取，指定 tag 只决定安装的源码版本，不表示该历史 tag 已包含后续改动。
+
+安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。执行前请先阅读[安装与升级](docs/INSTALLATION.md)，检查安装脚本和目标 tag 的源码。
 
 使用步骤：
 
 1. 在支持的 Linux VPS 上，以 root 权限执行安装命令。
-2. 安装器检查环境、准备 Python 3 和系统依赖，并下载、校验安装包。
+2. 安装器检查环境、准备 Python 3 和系统依赖，下载目标 commit 的源码并安全检查解压，同时下载并校验 sing-box。
 3. 安装完成后，有交互终端时会显示主菜单，不会自动设置节点；无交互终端时，请运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。每次运行都先显示主菜单，包括没有节点数据的首次使用。
 4. 需要首次设置时，选择“1 节点管理 → 4 首次设置向导”，按编号选择要安装的节点（可多选），仅填写所选节点的参数，不会默认安装全部。保存后选择“4 服务管理 → 2 检查配置并启动服务”。之后仍需检查证书并用客户端测试连接。
 5. 选择用户、节点或出口时，按名称找到对象并输入列表编号，不需要复制 ID。具体操作见[使用指南](docs/USER_GUIDE.md)。
@@ -34,40 +34,41 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/inst
 
 你不需要手动安装 pip 包、创建 Python 虚拟环境或编写 sing-box JSON 配置。**安装完成或首次设置已保存，都不代表节点已经可以连接。** 证书申请和客户端连接仍受域名、网络及服务状态影响。
 
-## V1 包含哪些功能
+## 包含哪些功能
 
 - 三种节点：VLESS + REALITY + Vision、Hysteria2、VLESS + WebSocket + TLS。
 - 同一用户可以使用多个节点，每个节点分别设置使用权限和连接密钥。
-- 出口类型可扩展，首版提供 SOCKS5 出口。
+- 出口类型可扩展，目前提供 SOCKS5 出口。
 - 每个用户在每个节点上可保存多个出口，并选择其中一个使用，或选择直连（DIRECT，不经过代理出口）。
 - 不支持 UDP 的代理出口会阻止 UDP 流量，不会偷偷改用 VPS 直连。
 - 由 sing-box 通过 ACME 申请和续期证书，管理器提供检查功能。
 - 导出分享链接和客户端 JSON 配置，查看 systemd 服务状态和日志。
 - 修改配置前检查、备份，并通过操作锁避免同时写入；应用失败时尝试一起恢复管理数据和服务配置。
 
-V1 不包含网页管理面板、多 VPS 管理、流量计费、自动出口切换或 Cloudflare API 自动配置。
+不包含网页管理面板、多 VPS 管理、流量计费、自动出口切换或 Cloudflare API 自动配置。
 
 ## 系统与网络要求
 
 - 安装脚本支持 Debian 12/13 和 Ubuntu 22.04/24.04，系统需要使用 systemd；其他版本暂不支持。
-- 安装和管理服务需要 root 权限。VPS 需要能下载系统依赖和 GitHub 发布文件。
+- 安装和管理服务需要 root 权限。VPS 需要能下载系统依赖、访问 GitHub API 和源码下载服务，以及下载 sing-box 官方发布文件。
 - 安装器会检查和准备 Python 3，程序主要使用 Python 标准库。
-- V1 需求暂定使用 sing-box 1.14.x，且必须支持 ACME Certificate Provider（证书申请功能）。实际发布前仍需核对版本、配置字段和运行行为。
-- 使用 HTTP-01 申请证书时，域名必须指向正确地址，公网 TCP 80 必须能到达 VPS 源站。V1 不支持 DNS-01 验证方式。
+- sing-box 兼容范围为 1.14.x，且必须支持 ACME Certificate Provider（证书申请功能）。
+- 使用 HTTP-01 申请证书时，域名必须指向正确地址，公网 TCP 80 必须能到达 VPS 源站。不支持 DNS-01 验证方式。
 - Cloudflare 的 DNS 解析、代理开关和 Origin Rules（回源规则）需要自行设置，程序不会代为配置。
 
 ## 安装和升级如何处理数据
 
 安装器使用 Bash，负责安装程序和准备环境；管理程序使用 Python，负责菜单、用户、出口和配置。
 
-安装包来自指定版本的 GitHub Release，并检查 SHA-256。不指定版本时选择稳定版，也可以明确指定版本。程序文件与管理数据、服务配置、备份分开保存。重复安装同一版本会保留已有部署；升级会保留旧版本和数据备份，失败时尝试恢复旧程序。恢复结果仍需检查，不能当作已经完成 Linux 验收。
+安装器接受可选的 `vMAJOR.MINOR.PATCH` tag；不指定时通过 GitHub `git/matching-refs/tags/v` API 选择语义版本最高的 tag。轻量 tag 和附注 tag 都会解析到 commit，再通过 HTTPS 从 `codeload.github.com/OWNER/REPO/tar.gz/COMMIT` 下载源码并安全检查解压。本项目不提供发布附件或 `SHA256SUMS`；sing-box 仍从其官方 GitHub Release 下载并按官方摘要校验。
+
+程序文件与管理数据、服务配置、备份分开保存。重复安装同一版本会保留已有部署；升级会保留旧版本和数据备份，失败时尝试恢复旧程序。恢复后请检查服务状态和数据。
 
 ## 项目结构与本地开发
 
 相关文档：
 
 - [贡献指南](AGENTS.md)：代码组织、命名、测试和提交要求。
-- [验证记录与待完成验收](docs/VALIDATION.md)：V1 验收条件及当前限制。
 
 主要文件和目录：
 
@@ -100,6 +101,5 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 - [安装与升级](docs/INSTALLATION.md)
 - [使用指南](docs/USER_GUIDE.md)
-- [验证记录与待完成验收](docs/VALIDATION.md)
 
 安装后的系统模式只能在 Linux 上以 root 权限使用。首次成功启动服务后，用户、节点和出口等设置的修改会自动更新服务；本地模式不会操作系统服务。
