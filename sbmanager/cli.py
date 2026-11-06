@@ -1,5 +1,4 @@
 """Interactive menus for local settings and installed service management."""
-import getpass
 import json
 import os
 import shutil
@@ -306,7 +305,7 @@ def user_action(action, manager):
 
 
 def edit_egress(manager, profile=None):
-    link = getpass.getpass('节点分享链接（支持 http、socks5、ss；输入隐藏；0 取消）\n> ').strip()
+    link = ask('节点分享链接（支持 http、socks5、ss；输入可见，含账号密码请勿公开；0 取消）')
     if link == '0':
         raise Cancelled
     protocol, settings, link_name = parse_link(link)

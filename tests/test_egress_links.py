@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sbmanager.cli import Cancelled, MENUS, egress_action
+from sbmanager.cli import Cancelled, MENUS, edit_egress, egress_action
 from sbmanager.core.config_builder import build
 from sbmanager.core.state_manager import StateStore
 from sbmanager.egress.links import parse_link
@@ -66,22 +66,36 @@ class EgressLinkTests(unittest.TestCase):
                 self.assertNotIn('secret', str(error.exception))
                 self.assertEqual(before, self.manager.store.read())
 
+    def test_cli_link_uses_visible_input_without_truncation(self):
+        link = 'socks5://alice:' + 'p' * 200 + '@host:1080#出口'
+        with patch('getpass.getpass', side_effect=AssertionError('链接不应隐藏输入')), \
+                patch('builtins.input', side_effect=[link, '', '']) as reader:
+            edit_egress(self.manager)
+        prompt = reader.call_args_list[0].args[0]
+        self.assertIn('输入可见', prompt)
+        self.assertNotIn('输入隐藏', prompt)
+        profile = next(iter(self.manager.store.read()['egress'].values()))
+        self.assertEqual('alice', profile['settings']['username'])
+        self.assertEqual('p' * 200, profile['settings']['password'])
+        self.assertEqual('出口', profile['name'])
+
     def test_cli_add_edit_and_cancel(self):
         self.assertEqual('添加出口', MENUS[2][1][1])
-        with patch('sbmanager.cli.getpass.getpass', return_value='http://host:8080#入口'), \
-                patch('builtins.input', return_value=''), contextlib.redirect_stdout(io.StringIO()):
+        with patch('builtins.input', side_effect=['http://host:8080#入口', '']), \
+                contextlib.redirect_stdout(io.StringIO()):
             egress_action(2, self.manager)
         key, profile = next(iter(self.manager.store.read()['egress'].items()))
         self.assertEqual('入口', profile['name'])
-        with patch('sbmanager.cli.getpass.getpass', return_value='ss://' + b64('aes-128-gcm:secret') + '@host:8388'), \
-                patch('builtins.input', side_effect=['1', '', 'y']), contextlib.redirect_stdout(io.StringIO()):
+        with patch('builtins.input', side_effect=[
+                '1', 'ss://' + b64('aes-128-gcm:secret') + '@host:8388', '', 'y']), \
+                contextlib.redirect_stdout(io.StringIO()):
             egress_action(5, self.manager)
         profile = self.manager.store.read()['egress'][key]
         self.assertEqual('ss', profile['protocol'])
         self.assertTrue(profile['settings']['udp'])
         self.assertEqual('入口', profile['name'])
         before = self.manager.store.read()
-        with patch('sbmanager.cli.getpass.getpass', return_value='0'), self.assertRaises(Cancelled):
+        with patch('builtins.input', return_value='0'), self.assertRaises(Cancelled):
             egress_action(2, self.manager)
         self.assertEqual(before, self.manager.store.read())
 

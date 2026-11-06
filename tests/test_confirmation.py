@@ -20,8 +20,7 @@ class ConfirmationTests(unittest.TestCase):
             for answer in ('y', 'Y', 'n', 'N', '', 'yes', 'invalid'):
                 with self.subTest(protocol=protocol, answer=answer):
                     manager = Mock()
-                    with patch('sbmanager.cli.getpass.getpass', return_value=link), \
-                            patch('builtins.input', side_effect=['proxy', answer]) as reader:
+                    with patch('builtins.input', side_effect=[link, 'proxy', answer]) as reader:
                         edit_egress(manager)
                     self.assertEqual(answer.lower() == 'y', manager.save_egress.call_args.args[2]['udp'])
                     self.assertIn('[y/N]', reader.call_args.args[0])
