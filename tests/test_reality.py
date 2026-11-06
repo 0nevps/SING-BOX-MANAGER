@@ -2,11 +2,13 @@ import ssl
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlparse
 
 from sbmanager.core.state_manager import StateStore
 from sbmanager.modules.manager import Manager
-from sbmanager.modules.node_manager import ask_reality_names, configure
+from sbmanager.modules.node_manager import ask_reality_names, configure, websocket_path
 from sbmanager.modules.initialization import wizard
+from sbmanager.modules.export_manager import export_user
 from sbmanager.security import ValidationError
 from sbmanager.system.network import check_reality_target
 
@@ -67,6 +69,7 @@ class RealityTests(unittest.TestCase):
             self.assertFalse(manager.store.path.exists())
 
     def test_wizard_defaults_first_username_and_accepts_custom_name(self):
+        paths = set()
         for answer, expected in [('', 'default'), ('Alice', 'Alice')]:
             with self.subTest(answer=answer), tempfile.TemporaryDirectory() as directory:
                 manager = Manager(StateStore(directory))
@@ -74,7 +77,7 @@ class RealityTests(unittest.TestCase):
                 engine.keypair.return_value = ('private', 'public')
                 ask = Mock(side_effect=[
                     'proxy.example', answer, 'target.example', '', 'hy.example',
-                    'ws.example', '', '', '', '', '', '', '', 'yes',
+                    'ws.example', '', '', '', '', '', 'yes',
                 ])
                 with patch('sbmanager.system.network.public_addresses', return_value={}), \
                      patch('sbmanager.modules.initialization.check_reality_target', return_value='TLS 检查通过'), \
@@ -86,3 +89,77 @@ class RealityTests(unittest.TestCase):
                 self.assertEqual(3, len(users[0]['grants']))
                 self.assertEqual(3, len(manager.store.read()['inbounds']))
                 self.assertIn('默认 default', ask.call_args_list[1].args[0])
+                self.assertEqual(12, ask.call_count)
+                ports = {i['protocol']: (i['settings']['port'], i['settings']['public_port'])
+                         for i in manager.store.read()['inbounds'].values()}
+                self.assertEqual({'reality': (443, 443), 'hysteria2': (443, 443),
+                                  'cloudflare_ws': (8443, 443)}, ports)
+                ws_inbound = next(i for i in manager.store.read()['inbounds'].values()
+                                  if i['protocol'] == 'cloudflare_ws')
+                path = ws_inbound['settings']['path']
+                self.assertRegex(path, r'^/[A-Za-z0-9_-]{22}$')
+                self.assertNotEqual('/gateway', path)
+                paths.add(path)
+                exported = export_user(manager.store.read(), users[0]['id'])
+                self.assertEqual(path, parse_qs(urlparse(exported['links'][2]).query)['path'][0])
+                self.assertEqual(path, exported['config']['outbounds'][3]['transport']['path'])
+        self.assertEqual(2, len(paths))
+
+    def test_wizard_can_customize_ports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = Manager(StateStore(directory))
+            engine = Mock()
+            engine.keypair.return_value = ('private', 'public')
+            ask = Mock(side_effect=[
+                'proxy.example', '', 'target.example', '', 'hy.example',
+                'ws.example', '', '2443', '5443', '1', '8444', 'yes',
+            ])
+            with patch('sbmanager.system.network.public_addresses', return_value={}), \
+                 patch('sbmanager.modules.initialization.check_reality_target', return_value='TLS 检查通过'), \
+                 patch('sbmanager.modules.initialization.socket.getaddrinfo'):
+                wizard(manager, engine, ask)
+            ports = {i['protocol']: (i['settings']['port'], i['settings']['public_port'])
+                     for i in manager.store.read()['inbounds'].values()}
+            self.assertEqual({'reality': (2443, 2443), 'hysteria2': (5443, 5443),
+                              'cloudflare_ws': (8444, 443)}, ports)
+
+    def test_wizard_direct_websocket_uses_one_port(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = Manager(StateStore(directory))
+            engine = Mock()
+            engine.keypair.return_value = ('private', 'public')
+            ask = Mock(side_effect=[
+                'proxy.example', '', 'target.example', '', 'hy.example',
+                'ws.example', '', '2443', '5443', '2', '8444', 'yes',
+            ])
+            with patch('sbmanager.system.network.public_addresses', return_value={}), \
+                 patch('sbmanager.modules.initialization.check_reality_target', return_value='TLS 检查通过'), \
+                 patch('sbmanager.modules.initialization.socket.getaddrinfo'):
+                wizard(manager, engine, ask)
+            ports = {i['protocol']: (i['settings']['port'], i['settings']['public_port'])
+                     for i in manager.store.read()['inbounds'].values()}
+            self.assertEqual({'reality': (2443, 2443), 'hysteria2': (5443, 5443),
+                              'cloudflare_ws': (8444, 8444)}, ports)
+            state = manager.store.read()
+            user = next(iter(state['users'].values()))
+            exported = export_user(state, user['id'])
+            self.assertEqual(8444, exported['config']['outbounds'][3]['server_port'])
+            self.assertEqual(8444, urlparse(exported['links'][2]).port)
+
+    def test_websocket_path_generation_reuse_and_override(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = Manager(StateStore(directory))
+            iid = manager.add_inbound('WebSocket', 'cloudflare_ws')
+            settings = {'port': 8443, 'public_port': 443,
+                        'public_host': 'ws.example', 'server_name': 'ws.example'}
+            configure(manager, None, iid, settings)
+            first = manager.store.read()['inbounds'][iid]['settings']['path']
+            self.assertRegex(first, r'^/[A-Za-z0-9_-]{22}$')
+            configure(manager, None, iid, settings)
+            self.assertEqual(first, manager.store.read()['inbounds'][iid]['settings']['path'])
+            configure(manager, None, iid, dict(settings, path='/custom'))
+            self.assertEqual('/custom', manager.store.read()['inbounds'][iid]['settings']['path'])
+            configure(manager, None, iid, settings)
+            self.assertEqual('/custom', manager.store.read()['inbounds'][iid]['settings']['path'])
+            with self.assertRaises(ValidationError):
+                websocket_path('/bad?query')

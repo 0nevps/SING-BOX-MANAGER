@@ -2,7 +2,7 @@
 import copy
 import secrets
 import socket
-from sbmanager.modules.node_manager import host, ask_reality_names
+from sbmanager.modules.node_manager import host, ask_reality_names, websocket_path, ask_inbound_ports
 from sbmanager.system.network import check_reality_target
 from sbmanager.security import credential, identifier, text, ValidationError
 
@@ -23,9 +23,7 @@ def wizard(manager, engine, ask):
     print(check_reality_target(handshake, server_name))
     hy_domain = host(ask('Hysteria2 证书域名'))
     ws_domain = host(ask('WebSocket 证书域名'))
-    ws_path = ask('WebSocket 路径（默认 /gateway）') or '/gateway'
-    if not ws_path.startswith('/') or any(c.isspace() or c in '?#' for c in ws_path):
-        raise ValidationError('无效 WebSocket 路径')
+    ws_path = websocket_path(ask('WebSocket 路径（回车随机生成）'))
     for domain in (hy_domain, ws_domain):
         try:
             socket.getaddrinfo(domain, 80)
@@ -34,12 +32,8 @@ def wizard(manager, engine, ask):
     print('必须确保公网 TCP 80 到达源站；DNS 和本地端口检查不能证明公网可达。')
     private, public = engine.keypair()
     nodes = []
-    for protocol, default, domain in [('reality', 443, server_name), ('hysteria2', 443, hy_domain), ('cloudflare_ws', 8443, ws_domain)]:
-        port = int(ask(f'{protocol} 源站端口（默认 {default}）') or default)
-        external = int(ask(f'{protocol} 客户端端口（默认 {443 if protocol == "cloudflare_ws" else port}）') or (443 if protocol == 'cloudflare_ws' else port))
-        if not 1 <= port <= 65535 or not 1 <= external <= 65535:
-            raise ValidationError('无效端口')
-        settings = {'port': port, 'public_port': external, 'server_name': domain,
+    for protocol, domain in [('reality', server_name), ('hysteria2', hy_domain), ('cloudflare_ws', ws_domain)]:
+        settings = {**ask_inbound_ports(ask, protocol), 'server_name': domain,
                     'public_host': public_host if protocol == 'reality' else domain}
         if protocol == 'reality':
             settings.update(private_key=private, public_key=public, short_id=secrets.token_hex(8), handshake=handshake)
@@ -56,4 +50,5 @@ def wizard(manager, engine, ask):
         current['users'][uid] = {'id': uid, 'name': name, 'enabled': True,
             'grants': {node['id']: credential(node['protocol']) for node in nodes}}
     manager.store.update(initialize)
+    print('WebSocket 路径:', ws_path)
     print('初始化资料已保存。选择“校验并部署”启动服务，随后验证客户端和证书。')

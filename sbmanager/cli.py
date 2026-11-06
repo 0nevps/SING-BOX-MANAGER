@@ -3,7 +3,7 @@ import getpass
 import json
 import subprocess
 from pathlib import Path
-from sbmanager.modules.node_manager import configure, ask_reality_names
+from sbmanager.modules.node_manager import configure, ask_reality_names, ask_inbound_ports
 from sbmanager.modules.export_manager import export_user
 from sbmanager.modules.certificate_manager import inspect
 from sbmanager.core.transaction_manager import atomic_write, encode
@@ -65,17 +65,21 @@ def run(manager, engine=None, deployment=None):
             elif action == '13':
                 iid = ask('入站 ID')
                 inbound = manager.store.read()['inbounds'][iid]
-                values = {'port': int(ask('源站监听端口')), 'public_port': int(ask('客户端连接端口')),
+                values = {**ask_inbound_ports(ask, inbound['protocol'], inbound.get('settings')),
                           'public_host': ask('客户端连接 IP/域名')}
                 if inbound['protocol'] == 'reality':
                     values['handshake'], values['server_name'] = ask_reality_names(ask)
                 else:
                     values['server_name'] = ask('TLS Server Name/证书域名')
                     if inbound['protocol'] == 'cloudflare_ws':
-                        values['path'] = ask('WebSocket 路径，例如 /gateway')
+                        existing_path = inbound.get('settings', {}).get('path')
+                        hint = f'回车保留 {existing_path}' if existing_path else '回车随机生成'
+                        values['path'] = ask(f'WebSocket 路径（{hint}）')
                 configure(manager, engine, iid, values)
                 if inbound['protocol'] == 'reality':
                     print('目标连通性、TLS 1.3 和证书域名校验通过；仍需 REALITY 客户端验证连接。')
+                elif inbound['protocol'] == 'cloudflare_ws':
+                    print('WebSocket 路径:', manager.store.read()['inbounds'][iid]['settings']['path'])
             elif action == '14':
                 if not deployment:
                     raise ValueError('部署需要已安装的 Linux 系统模式')
