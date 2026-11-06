@@ -79,11 +79,11 @@ def menu_text(text, prefix='  ', tone=None):
 
 def menu_heading(title):
     print()
-    print(styled('=' * menu_width(), 'accent'))
+    print(styled('=' * min(32, menu_width()), 'accent'))
     if title == '主菜单':
         menu_text('SING-BOX MANAGER', tone='title')
     menu_text(title, tone='section')
-    print(styled('-' * menu_width(), 'accent'))
+    print(styled('-' * min(32, menu_width()), 'accent'))
 
 
 # Group labels without changing the established numeric shortcuts.
@@ -111,9 +111,9 @@ def choose(title, options, back='取消'):
             tone = 'error' if label in DANGEROUS else 'warning' if label in CAUTION else 'accent'
             suffix = ' [危险]' if label in DANGEROUS else ' [注意]' if label in CAUTION else ''
             menu_text(label + suffix, prefix=f' {number:>2} ', tone=tone)
-        print(styled('-' * menu_width(), 'accent'))
+        print(styled('-' * min(32, menu_width()), 'accent'))
         menu_text(back, prefix='  0 ', tone='section')
-        print(styled('=' * menu_width(), 'accent'))
+        print(styled('=' * min(32, menu_width()), 'accent'))
         answer = ask(f'请选择 [0-{len(options)}]')
         if answer == '0':
             raise Cancelled
@@ -162,7 +162,7 @@ def show_records(manager, kind):
     menu_heading({'inbounds': '节点列表', 'users': '用户列表', 'egress': '出口列表'}[kind])
     for number, record in enumerate(records.values(), 1):
         if number > 1:
-            print(styled('-' * menu_width(), 'accent'))
+            print(styled('-' * min(32, menu_width()), 'accent'))
         menu_text(f'{number}. {record["name"]}', tone='section')
         if kind == 'inbounds':
             settings = record.get('settings', {})

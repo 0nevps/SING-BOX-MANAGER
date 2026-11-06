@@ -38,6 +38,13 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('[配置管理]', output)
         self.assertIn('[系统维护]', output)
 
+    def test_menu_rules_are_short_on_wide_terminals(self):
+        with patch('sbmanager.cli.shutil.get_terminal_size', return_value=os.terminal_size((120, 24))):
+            output, _ = self.run_menu(['2', '0', '0'])
+        rules = re.findall(r'^[=-]+$', output, re.MULTILINE)
+        self.assertTrue(rules)
+        self.assertTrue(all(len(rule) == 32 for rule in rules))
+
     def test_submenu_returns_to_main(self):
         output, _ = self.run_menu(['2', '0', '0'])
         self.assertEqual(2, output.count('主菜单'))
