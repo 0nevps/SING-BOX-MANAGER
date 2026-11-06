@@ -2,7 +2,8 @@
 import copy
 import secrets
 import socket
-from sbmanager.modules.node_manager import host
+from sbmanager.modules.node_manager import host, ask_reality_names
+from sbmanager.system.network import check_reality_target
 from sbmanager.security import credential, identifier, text, ValidationError
 
 
@@ -18,8 +19,8 @@ def wizard(manager, engine, ask):
     default_host = addresses.get('ipv4') or addresses.get('ipv6', '')
     public_host = host(ask(f'服务器公网 IP/域名（默认 {default_host}）') or default_host)
     name = text(ask('首个用户名'), '用户名')
-    server_name = host(ask('REALITY Server Name'))
-    handshake = host(ask('REALITY 握手目标'))
+    handshake, server_name = ask_reality_names(ask)
+    print(check_reality_target(handshake, server_name))
     hy_domain = host(ask('Hysteria2 证书域名'))
     ws_domain = host(ask('WebSocket 证书域名'))
     ws_path = ask('WebSocket 路径（默认 /gateway）') or '/gateway'

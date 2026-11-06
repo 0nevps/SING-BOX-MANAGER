@@ -2,6 +2,7 @@ import ipaddress
 import re
 import secrets
 from sbmanager.security import ValidationError, text
+from sbmanager.system.network import check_reality_target
 
 
 def host(value):
@@ -17,14 +18,17 @@ def host(value):
 
 def configure(manager, engine, inbound_id, values):
     values = dict(values)
+    inbound = manager.store.read()['inbounds'][inbound_id]
+    if inbound['protocol'] == 'reality':
+        values['server_name'] = values.get('server_name') or values['handshake']
     for field in ('server_name', 'public_host'):
         values[field] = host(values[field])
     for field in ('port', 'public_port'):
         if type(values.get(field)) is not int or not 1 <= values[field] <= 65535:
             raise ValidationError('端口范围为 1–65535')
-    inbound = manager.store.read()['inbounds'][inbound_id]
     if inbound['protocol'] == 'reality':
         values['handshake'] = host(values['handshake'])
+        check_reality_target(values['handshake'], values['server_name'], values.get('handshake_port', 443))
         previous = inbound.get('settings', {})
         if previous.get('private_key'):
             values['private_key'], values['public_key'] = previous['private_key'], previous['public_key']
@@ -40,3 +44,9 @@ def configure(manager, engine, inbound_id, values):
     def change(state):
         state['inbounds'][inbound_id]['settings'] = values
     manager.store.update(change)
+
+
+def ask_reality_names(ask):
+    target = host(ask('REALITY 握手目标域名'))
+    server_name = host(ask(f'REALITY SNI（默认 {target}，回车使用默认值）') or target)
+    return target, server_name
