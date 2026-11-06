@@ -39,6 +39,8 @@ Tests use `unittest`; no coverage threshold is configured. Name files `test_*.py
 
 No Git history is available to establish conventions. Write concise English imperative commit subjects, such as `fix: install from main`. PRs should link relevant issues or requirements, explain behavior changes, and include validation results and sanitized CLI transcripts when useful.
 
+The default delivery target is `main`. Feature branches are temporary working branches, not the final delivery destination. Commit and push only when authorized by the user. When branch-based work is required, merge into `main` and push it once authorized; remove the temporary local and remote branches when requested. If changes have not reached `main`, explicitly report that they have not yet been delivered to the main branch.
+
 ## Distribution & security requirements
 
 Install and update directly from this repository's `main` branch. Do not create project Git tags, GitHub Releases, or release attachments. The installer accepts only `OWNER/REPOSITORY`. Resolve `main` to its current commit through GitHub's `git/ref/heads/main` API, download complete source over HTTPS from `codeload.github.com/OWNER/REPO/tar.gz/COMMIT`, and validate archive contents before extraction.
