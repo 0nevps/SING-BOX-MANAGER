@@ -7,7 +7,7 @@ PROTOCOLS = ('reality', 'hysteria2', 'cloudflare_ws')
 
 def require(mapping, key, label):
     if key not in mapping:
-        raise ValidationError(f'找不到指定的{label}。请在菜单 1 查看当前设置，并复制正确的 ID')
+        raise ValidationError(f'找不到指定的{label}，请返回菜单重新选择')
     return mapping[key]
 
 
@@ -32,6 +32,19 @@ class Manager:
             key = identifier()
             state['users'][key] = {'id': key, 'name': name, 'enabled': True, 'grants': {}}
             return key
+        return self.store.update(change)
+
+    def add_user_all(self, name):
+        name = text(name, '用户名')
+        def change(state):
+            if any(user['name'] == name for user in state['users'].values()):
+                raise ValidationError('这个用户名已存在，请换一个名称')
+            if not state['inbounds']:
+                raise ValidationError('暂无节点，请先添加节点或运行首次设置向导')
+            uid = identifier()
+            state['users'][uid] = {'id': uid, 'name': name, 'enabled': True,
+                'grants': {iid: credential(node['protocol']) for iid, node in state['inbounds'].items()}}
+            return uid
         return self.store.update(change)
 
     def grant(self, user_id, inbound_id):
@@ -88,7 +101,7 @@ class Manager:
         def change(state):
             require(state['egress'], egress_id, '出口')
             if any(egress_id in b['saved'] for b in state['bindings'].values()):
-                raise ValidationError('还有用户保存了这个出口，暂时不能删除。请先在菜单 6 切换到其他出口或直连，再在菜单 12 移除它')
+                raise ValidationError('出口仍被用户保存，请先在“出口管理”中切换出口，再移除已保存的出口')
             del state['egress'][egress_id]
         self.store.update(change)
 
@@ -109,9 +122,9 @@ class Manager:
         def change(state):
             binding = require(state['bindings'], f'{user_id}:{inbound_id}', '用户节点出口设置')
             if egress_id not in binding['saved']:
-                raise ValidationError('这个用户在指定节点上没有保存该出口，请检查用户、节点和出口 ID')
+                raise ValidationError('此节点未保存该出口，请返回菜单重新选择')
             if binding['active'] == egress_id:
-                raise ValidationError('这个出口正在使用，不能直接移除。请先在菜单 6 切换到其他出口，或将出口 ID 留空改为直连（DIRECT），再重试')
+                raise ValidationError('出口正在使用，请先在“切换用户出口”中选择其他出口或直连')
             binding['saved'].remove(egress_id)
         self.store.update(change)
 

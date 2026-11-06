@@ -102,7 +102,7 @@ class Deployment:
 
     def restore(self, name):
         if Path(name).name != name or not name.endswith('.json'):
-            raise ValidationError('备份文件名不正确。请从菜单 22 复制完整的 .json 文件名，不要填写目录路径')
+            raise ValidationError('备份文件名不正确。请到“备份与恢复 > 从备份恢复”按编号选择备份')
         snapshot = json.loads((self.backups / name).read_text())
         if snapshot['state'] is None:
             raise ValidationError('这份备份没有保存用户、节点等数据，无法恢复。请选择其他备份')

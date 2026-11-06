@@ -110,10 +110,10 @@ class BusinessTests(unittest.TestCase):
 
     def test_cli_create_list_exit(self):
         result = subprocess.run([sys.executable, 'main.py', '--state-dir', str(self.store.directory)],
-                                input='2\nBob\n1\n0\n', text=True, capture_output=True)
+                                input='2\n2\nBob\n1\n0\n0\n', text=True, capture_output=True)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn('Bob', result.stdout)
-        self.assertIn('尚未应用', result.stdout)
+        self.assertIn('仅保存设置，不操作服务', result.stdout)
         self.assertNotIn('secret', result.stdout)
 
     def test_invalid_profile_is_rejected(self):

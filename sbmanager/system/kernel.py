@@ -66,6 +66,6 @@ def upgrade(deployment, version):
                 atomic_write(binary, backup.read_bytes())
                 binary.chmod(0o755)
                 deployment.service.restart()
-                raise ValidationError('新版 sing-box 启动检查未通过，已换回旧版并重启服务。请选菜单 18 检查状态、菜单 19 查看日志') from None
+                raise ValidationError('新版 sing-box 启动检查未通过，已换回旧版并重启服务。请到“服务管理 > 查看状态”和“查看日志”确认') from None
     finally:
         candidate.unlink(missing_ok=True)

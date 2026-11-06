@@ -6,13 +6,13 @@ from sbmanager.security import ValidationError
 def export_user(state, user_id):
     user = state['users'].get(user_id)
     if not user or not user['enabled']:
-        raise ValidationError('找不到用户，或该用户已停用。请在菜单 1 核对用户 ID；如已停用，请在菜单 7 启用后再导出')
+        raise ValidationError('找不到用户，或该用户已停用。请在“用户管理 > 启用或停用”核对并启用用户，再到“导出客户端配置”重试')
     outbounds, links = [], []
     for iid, secret in user['grants'].items():
         inbound = state['inbounds'][iid]
         settings = inbound.get('settings')
         if not settings:
-            raise ValidationError('节点还没有设置地址和端口。请先选菜单 13 完成设置，再导出')
+            raise ValidationError('节点还没有设置地址和端口。请到“节点管理 > 设置地址和端口”完成设置，再导出')
         protocol = inbound['protocol']
         host = settings['public_host']
         port = settings.get('public_port', settings['port'])
@@ -40,7 +40,7 @@ def export_user(state, user_id):
         address = f'[{host}]' if ':' in host else host
         links.append(f'{scheme}://{quote(secret, safe="")}@{address}:{port}?{urlencode(params)}#{quote(inbound["name"], safe="")}')
     if not outbounds:
-        raise ValidationError('这个用户还不能使用任何节点。请先选菜单 4 开通节点使用权限，再导出')
+        raise ValidationError('这个用户还不能使用任何节点。请先到“用户管理 > 开通节点”授权，再导出')
     return {'links': links, 'config': {'inbounds': [{'type': 'mixed', 'tag': 'local', 'listen': '127.0.0.1', 'listen_port': 2080}],
             'outbounds': [{'type': 'selector', 'tag': 'proxy', 'outbounds': [n['tag'] for n in outbounds]}] + outbounds,
             'route': {'final': 'proxy'}}}

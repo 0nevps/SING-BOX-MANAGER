@@ -37,7 +37,7 @@ class Systemd:
                 if needed <= listeners:
                     return
             time.sleep(1)
-        raise ValidationError('服务未正常运行，或节点端口未就绪。请选菜单 19 查看服务日志，并检查端口是否被占用')
+        raise ValidationError('服务未正常运行，或节点端口未就绪。请到“服务管理 > 查看日志”排查，并检查端口占用')
 
     def logs(self):
         # Warn-level engine logs can contain remote addresses; never include config dumps.

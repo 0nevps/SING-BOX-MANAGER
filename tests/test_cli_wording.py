@@ -1,6 +1,7 @@
-"""Keep beginner-facing guidance accurate without changing menu behavior."""
+"""Exercise named selections, concise guidance, and safe menu operations."""
 import contextlib
 import io
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -23,77 +24,249 @@ class CliWordingTests(unittest.TestCase):
 
     def run_menu(self, answers, deployment=None):
         output = io.StringIO()
-        with patch('builtins.input', side_effect=answers) as ask, contextlib.redirect_stdout(output):
+        with patch('builtins.input', side_effect=answers) as reader, contextlib.redirect_stdout(output):
             result = run(self.manager, Mock(), deployment)
         self.assertEqual(0, result)
-        prompts = '\n'.join(call.args[0] for call in ask.call_args_list)
+        prompts = '\n'.join(call.args[0] for call in reader.call_args_list)
         return output.getvalue(), prompts
 
-    def test_menu_explains_terms_and_id_source(self):
-        output, prompts = self.run_menu(['0'])
-        for text in ('本地测试模式', '节点是手机或电脑连接的入口', '出口是 VPS 访问网络时使用的线路',
-                     'users 是用户，inbounds 是节点，egress 是出口', '14 检查配置并启动服务',
-                     '11 重置连接密钥', '27 升级 sing-box'):
-            self.assertIn(text, output)
-        self.assertIn('请输入菜单编号', prompts)
+    def add_proxy(self):
+        return self.manager.save_egress('proxy', 'socks5', {
+            'server': 'proxy.example.com', 'port': 1080,
+            'username': 'alice', 'password': 'secret', 'udp': False})
+
+    def test_help_is_only_shown_on_request(self):
+        output, _ = self.run_menu(['0'])
+        self.assertNotIn('独立的连接身份', output)
+        output, _ = self.run_menu(['6', '2', '0', '0'])
+        self.assertIn('独立的连接身份', output)
+        self.assertIn('直连不经过代理', output)
 
     def test_unsupported_local_action_explains_where_to_run_it(self):
         before = self.store.path.read_bytes()
-        output, _ = self.run_menu(['14', '0'])
-        self.assertIn('本地模式不能启动服务', output)
+        output, _ = self.run_menu(['4', '2', '0', '0'])
+        self.assertIn('Linux VPS', output)
         self.assertIn('sudo sbmanager', output)
         self.assertEqual(before, self.store.path.read_bytes())
 
     def test_delete_cancellation_warns_and_preserves_data(self):
         before = self.store.path.read_bytes()
-        _, prompts = self.run_menu(['9', self.user, 'no', '0'])
+        _, prompts = self.run_menu(['2', '8', '1', 'no', '0', '0'])
         self.assertIn('删除后无法直接撤销', prompts)
         self.assertIn('全部节点权限和出口设置', prompts)
         self.assertEqual(before, self.store.path.read_bytes())
 
-    def test_reset_warns_that_old_client_configuration_expires(self):
+    def test_reset_requires_confirmation_and_invalidates_old_credential(self):
         before = self.store.read()['users'][self.user]['grants'][self.node]
-        _, prompts = self.run_menu(['11', self.user, self.node, '0'])
-        self.assertIn('旧连接密钥失效', prompts)
+        _, prompts = self.run_menu(['2', '7', '1', '1', 'no', '7', '1', '1', 'yes', '0', '0'])
+        self.assertIn('旧连接密钥将失效', prompts)
         self.assertIn('需重新导出客户端配置', prompts)
         self.assertNotEqual(before, self.store.read()['users'][self.user]['grants'][self.node])
 
-    def test_empty_egress_still_selects_direct_and_keeps_saved_egress(self):
-        egress = self.manager.save_egress('proxy', 'socks5', {
-            'server': 'proxy.example.com', 'port': 1080,
-            'username': 'alice', 'password': 'secret', 'udp': False})
+    def test_direct_is_explicit_and_keeps_saved_egress(self):
+        egress = self.add_proxy()
         self.manager.bind(self.user, self.node, egress)
-        _, prompts = self.run_menu(['6', self.user, self.node, '', '0'])
-        self.assertIn('直接回车使用直连 DIRECT，不经过代理出口', prompts)
+        output, prompts = self.run_menu(['3', '3', '1', '1', '', '1', '0', '0'])
+        self.assertIn('1 直连（DIRECT）', output)
+        self.assertIn('编号无效', output)
+        self.assertNotIn('ID', prompts)
         binding = self.store.read()['bindings'][f'{self.user}:{self.node}']
         self.assertIsNone(binding['active'])
         self.assertEqual([egress], binding['saved'])
 
     def test_restore_cancellation_warns_and_does_not_restore(self):
         deployment = Mock()
-        _, prompts = self.run_menu(['23', 'backup.json', 'no', '0'], deployment)
+        deployment.backups = Path(self.temp.name) / 'backups'
+        deployment.backups.mkdir()
+        (deployment.backups / 'backup.json').touch()
+        output, prompts = self.run_menu(['5', '3', '1', 'no', '0', '0'], deployment)
+        self.assertIn('backup.json', output)
         self.assertIn('替换当前用户、节点、出口和配置，并重启服务', prompts)
         self.assertIn('当前设置会另存备份', prompts)
         deployment.restore.assert_not_called()
 
     def test_upgrade_cancellation_warns_and_does_not_upgrade(self):
         with patch('sbmanager.system.kernel.upgrade') as upgrade:
-            _, prompts = self.run_menu(['27', '1.14.4', 'no', '0'], Mock())
+            _, prompts = self.run_menu(['4', '5', '1.14.4', 'no', '0', '0'], Mock())
         self.assertIn('连接可能短暂中断', prompts)
-        self.assertIn('不要加 v', prompts)
+        self.assertIn('不加 v', prompts)
         upgrade.assert_not_called()
 
-    def test_invalid_enable_choice_gives_exact_accepted_values(self):
-        before = self.store.path.read_bytes()
-        output, prompts = self.run_menu(['7', self.user, 'yes', '0'])
-        self.assertIn('停用后不能连接，原设置保留', prompts)
-        self.assertIn('请输入 enable（启用）或 disable（停用）', output)
-        self.assertEqual(before, self.store.path.read_bytes())
+    def test_enable_and_disable_use_numbered_choices(self):
+        _, prompts = self.run_menu(['2', '5', '1', '2', '0', '0'])
+        self.assertFalse(self.store.read()['users'][self.user]['enabled'])
+        self.assertNotIn('enable', prompts)
+        self.run_menu(['2', '5', '1', '1', '0', '0'])
+        self.assertTrue(self.store.read()['users'][self.user]['enabled'])
 
     def test_duplicate_username_explains_how_to_continue(self):
         before = self.store.path.read_bytes()
-        output, _ = self.run_menu(['2', 'Alice', '0'])
+        output, _ = self.run_menu(['2', '2', 'Alice', '0', '0'])
         self.assertIn('这个用户名已存在，请换一个名称', output)
+        self.assertEqual(before, self.store.path.read_bytes())
+
+    def test_cancel_object_selection_keeps_current_submenu_and_state(self):
+        before = self.store.path.read_bytes()
+        output, _ = self.run_menu(['2', '8', '0', '0', '0'])
+        self.assertIn('Alice · 启用', output)
+        self.assertEqual(before, self.store.path.read_bytes())
+        self.assertNotIn('删除后无法', output)
+
+    def test_empty_selection_returns_without_error(self):
+        output, _ = self.run_menu(['3', '7', '0', '0'])
+        self.assertIn('暂无可选项', output)
+        self.assertNotIn('操作未完成', output)
+
+    def test_ungranted_nodes_are_not_offered_for_binding(self):
+        self.manager.add_inbound('not-allowed', 'hysteria2')
+        output, _ = self.run_menu(['3', '3', '1', '0', '0', '0'])
+        self.assertIn('REALITY', output)
+        self.assertNotIn('not-allowed', output)
+
+    def test_grant_only_offers_ungranted_nodes(self):
+        other = self.manager.add_inbound('HY2', 'hysteria2')
+        self.run_menu(['2', '4', '1', '1', '0', '0'])
+        self.assertIn(other, self.store.read()['users'][self.user]['grants'])
+
+    def test_add_node_uses_numbered_protocol_and_short_prompts(self):
+        output, prompts = self.run_menu(['1', '2', '2', 'new-node', '0', '0'])
+        node = next(node for node in self.store.read()['inbounds'].values() if node['name'] == 'new-node')
+        self.assertEqual('hysteria2', node['protocol'])
+        self.assertIn('选择协议', output)
+        self.assertNotIn('输入上面对应的英文值', prompts)
+
+    def test_edit_node_uses_selection_and_preserves_generated_path(self):
+        websocket = self.manager.add_inbound('WS', 'cloudflare_ws')
+        self.run_menu(['1', '3', '2', '1', '', 'node.example', 'node.example', '', '0', '0'])
+        settings = self.store.read()['inbounds'][websocket]['settings']
+        self.assertEqual(8443, settings['port'])
+        self.assertEqual(443, settings['public_port'])
+        self.assertEqual('cloudflare', settings['connection_mode'])
+        self.assertTrue(settings['path'].startswith('/'))
+        path = settings['path']
+        self.run_menu(['1', '3', '2', '1', '', 'node.example', 'node.example', '', '0', '0'])
+        self.assertEqual(path, self.store.read()['inbounds'][websocket]['settings']['path'])
+
+    def test_add_user_all_is_atomic_and_preserves_isolation(self):
+        self.run_menu(['2', '3', 'Bob', '0', '0'])
+        users = self.store.read()['users']
+        bob = next(user for user in users.values() if user['name'] == 'Bob')
+        self.assertEqual({self.node}, set(bob['grants']))
+        self.assertNotEqual(users[self.user]['grants'][self.node], bob['grants'][self.node])
+        before = self.store.path.read_bytes()
+        self.run_menu(['2', '3', 'Bob', '0', '0'])
+        self.assertEqual(before, self.store.path.read_bytes())
+
+    def test_add_user_all_without_nodes_does_not_create_user(self):
+        empty = StateStore(Path(self.temp.name) / 'empty')
+        manager = Manager(empty)
+        with self.assertRaisesRegex(ValueError, '暂无节点'):
+            manager.add_user_all('Bob')
+        self.assertEqual({}, empty.read()['users'])
+
+    def test_friendly_lists_hide_identifiers_and_secrets(self):
+        self.add_proxy()
+        output, _ = self.run_menu(['1', '1', '0', '2', '1', '0', '3', '1', '0', '0'])
+        self.assertIn('Alice', output)
+        self.assertIn('proxy.example.com:1080', output)
+        self.assertNotIn(self.user, output)
+        self.assertNotIn(self.node, output)
+        self.assertNotIn('secret', output)
+        self.assertNotIn('grants', output)
+
+    def test_advanced_json_remains_available_and_redacted(self):
+        self.add_proxy()
+        output, _ = self.run_menu(['6', '1', '0', '0'])
+        self.assertIn('"users":', output)
+        self.assertIn(self.user, output)
+        self.assertNotIn('secret', output)
+        self.assertIn('***', output)
+
+    def test_export_selects_user_and_preserves_file_permissions(self):
+        self.store.update(lambda state: state['inbounds'][self.node].update(settings={
+            'public_host': 'example.com', 'public_port': 443, 'port': 443,
+            'server_name': 'target.example', 'public_key': 'public', 'short_id': '0123456789abcdef'}))
+        destination = Path(self.temp.name) / 'export'
+        output, _ = self.run_menu(['2', '9', '1', str(destination), '0', '0'])
+        self.assertIn('文件含连接密钥', output)
+        self.assertTrue((destination / 'client.json').exists())
+        self.assertEqual(0o600, (destination / 'links.txt').stat().st_mode & 0o777)
+        self.assertEqual(0o700, destination.stat().st_mode & 0o777)
+        outbounds = json.loads((destination / 'client.json').read_text())['outbounds']
+        self.assertEqual([self.node], [item['tag'] for item in outbounds if item['type'] != 'selector'])
+
+    def test_remove_saved_egress_still_protects_active_binding(self):
+        egress = self.add_proxy()
+        self.manager.bind(self.user, self.node, egress)
+        output, _ = self.run_menu(['3', '6', '1', '1', '1', '0', '0'])
+        self.assertIn('出口正在使用', output)
+        self.assertEqual(egress, self.store.read()['bindings'][f'{self.user}:{self.node}']['active'])
+
+    def test_selecting_another_user_does_not_modify_first_user(self):
+        second = self.manager.add_user('Bob')
+        self.run_menu(['2', '5', '2', '2', '0', '0'])
+        state = self.store.read()
+        self.assertTrue(state['users'][self.user]['enabled'])
+        self.assertFalse(state['users'][second]['enabled'])
+
+    def test_revoke_and_delete_require_confirmation(self):
+        egress = self.add_proxy()
+        self.manager.bind(self.user, self.node, egress)
+        self.run_menu(['2', '6', '1', '1', 'no', '0', '0'])
+        self.assertIn(self.node, self.store.read()['users'][self.user]['grants'])
+        self.run_menu(['2', '6', '1', '1', 'yes', '0', '0'])
+        self.assertEqual({}, self.store.read()['bindings'])
+        self.assertEqual({}, self.store.read()['users'][self.user]['grants'])
+        self.run_menu(['2', '8', '1', 'yes', '0', '0'])
+        self.assertEqual({}, self.store.read()['users'])
+
+    def test_egress_creation_edit_test_and_deletion(self):
+        with patch('sbmanager.cli.getpass.getpass', return_value='hidden'):
+            self.run_menu(['3', '2', 'proxy', 'proxy.example.com', '1080', 'user', '', '0', '0'])
+            self.run_menu(['3', '5', '1', 'updated', 'other.example.com', '1081', 'user', 'yes', '0', '0'])
+        profile = next(iter(self.store.read()['egress'].values()))
+        self.assertEqual('updated', profile['name'])
+        self.assertEqual('other.example.com', profile['settings']['server'])
+        self.assertTrue(profile['settings']['udp'])
+        with patch('sbmanager.cli.driver') as driver:
+            driver.return_value.test_connection.return_value = {'note': '仅认证通过，未验证 UDP'}
+            output, _ = self.run_menu(['3', '4', '1', '0', '0'])
+            driver.return_value.test_connection.assert_called_once_with(profile)
+        self.assertIn('未验证 UDP', output)
+        self.run_menu(['3', '7', '1', 'yes', '0', '0'])
+        self.assertEqual({}, self.store.read()['egress'])
+
+    def test_service_and_backup_actions_reach_existing_operations(self):
+        deployment = Mock()
+        deployment.service.active.return_value = True
+        deployment.backups = Path(self.temp.name) / 'backups'
+        deployment.backups.mkdir()
+        (deployment.backups / 'old.json').touch()
+        output, _ = self.run_menu(['4', '1', '2', '3', '0',
+                                   '5', '1', '2', '3', '1', 'yes', '4', '2', 'yes', '0', '0'], deployment)
+        deployment.service.logs.assert_called_once()
+        deployment.backup.assert_called_once()
+        deployment.restore.assert_called_once_with('old.json')
+        deployment.prune.assert_called_once_with(2)
+        self.assertTrue(self.store.read()['deployed'])
+        self.assertEqual(2, self.store.read()['backup_keep'])
+        self.assertIn('请用客户端测试连接', output)
+
+    def test_certificate_output_is_not_raw_json(self):
+        result = {'domains': [{'domain': 'node.example', 'addresses': ['192.0.2.1']}],
+                  'certificates': [{'file': 'node.crt', 'expires': 'Jan 1 2030'}]}
+        with patch('sbmanager.cli.inspect', return_value=result):
+            output, _ = self.run_menu(['4', '4', '0', '0'], Mock())
+        self.assertIn('域名：node.example', output)
+        self.assertIn('到期：Jan 1 2030', output)
+        self.assertIn('不代表签发或续期成功', output)
+        self.assertNotIn('"domains"', output)
+
+    def test_backup_retention_cancellation_does_not_prune(self):
+        before = self.store.path.read_bytes()
+        deployment = Mock()
+        self.run_menu(['5', '4', '1', 'no', '0', '0'], deployment)
+        deployment.prune.assert_not_called()
         self.assertEqual(before, self.store.path.read_bytes())
 
 

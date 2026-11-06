@@ -44,7 +44,7 @@ def ask_inbound_ports(ask, protocol, previous=None):
         if current_mode is None and previous.get('port') == previous.get('public_port') and previous.get('port'):
             current_mode = 'direct'
         default_choice = '2' if current_mode == 'direct' else '1'
-        choice = ask(f'WebSocket 连接方式：1 经过 Cloudflare 代理，2 直连 VPS（默认 {default_choice}）') or default_choice
+        choice = ask(f'WebSocket 连接方式（默认 {default_choice}）\n1 Cloudflare 代理\n2 直连 VPS') or default_choice
         if choice not in ('1', '2'):
             raise ValidationError('请选择 1 或 2')
         mode = 'cloudflare' if choice == '1' else 'direct'
@@ -57,7 +57,7 @@ def ask_inbound_ports(ask, protocol, previous=None):
         raise ValidationError('端口必须是 1–65535 之间的整数，请重新填写')
     public_port = 443 if mode == 'cloudflare' else port
     if mode == 'cloudflare':
-        print(f'手机或电脑连接 Cloudflare 的 HTTPS 443 端口；Cloudflare 再连接 VPS 的 {port} 端口。请在 Cloudflare 的回源规则中设置此端口，程序不会自动设置。')
+        print(f'客户端端口：443；VPS 端口：{port}。\n请手动设置 Cloudflare 回源端口为 {port}。')
     else:
         print(f'{label}：手机/电脑连接时也使用 {port} 端口。')
     result = {'port': port, 'public_port': public_port}
@@ -94,6 +94,6 @@ def configure(manager, engine, inbound_id, values):
 
 
 def ask_reality_names(ask):
-    target = host(ask('REALITY 目标网站域名（握手目标：需支持 TLS 1.3，不要加 https://）'))
-    server_name = host(ask(f'REALITY 证书域名（SNI，通常与目标网站相同；直接回车使用 {target}）') or target)
+    target = host(ask('REALITY 目标域名（需支持 TLS 1.3）'))
+    server_name = host(ask(f'REALITY SNI（默认 {target}）') or target)
     return target, server_name

@@ -24,4 +24,4 @@ def inspect(state, acme_directory):
         except (ValueError, ssl.SSLError):
             certificates.append({'file': path.name, 'error': '无法读取证书文件，请检查文件是否完整、格式是否正确'})
     return {'domains': results, 'certificates': certificates,
-            'note': '这里仅显示域名解析结果和本地保存的证书，不代表证书申请或续期已成功。domains 是域名检查，certificates 是本地证书，expires 是到期时间；证书由 sing-box 自动申请和续期，失败时请选菜单 19 查看日志'}
+            'note': '仅检查 DNS 和本地证书，不代表签发或续期成功。ACME 由 sing-box 负责；失败时请到“服务管理 > 查看日志”排查'}
