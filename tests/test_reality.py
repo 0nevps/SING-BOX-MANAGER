@@ -61,7 +61,7 @@ class RealityTests(unittest.TestCase):
     def test_wizard_probe_failure_does_not_save(self):
         with tempfile.TemporaryDirectory() as directory:
             manager = Manager(StateStore(directory))
-            ask = Mock(side_effect=['proxy.example', 'Alice', 'target.example', ''])
+            ask = Mock(side_effect=['1', 'proxy.example', 'Alice', 'target.example', ''])
             with patch('sbmanager.system.network.public_addresses', return_value={}), \
                  patch('sbmanager.modules.initialization.check_reality_target', side_effect=ValidationError('failed')):
                 with self.assertRaises(ValidationError):
@@ -76,7 +76,7 @@ class RealityTests(unittest.TestCase):
                 engine = Mock()
                 engine.keypair.return_value = ('private', 'public')
                 ask = Mock(side_effect=[
-                    'proxy.example', answer, 'target.example', '', 'hy.example',
+                    '1 2 3', 'proxy.example', answer, 'target.example', '', 'hy.example',
                     'ws.example', '', '', '', '', '', 'yes',
                 ])
                 with patch('sbmanager.system.network.public_addresses', return_value={}), \
@@ -88,8 +88,8 @@ class RealityTests(unittest.TestCase):
                 self.assertEqual(expected, users[0]['name'])
                 self.assertEqual(3, len(users[0]['grants']))
                 self.assertEqual(3, len(manager.store.read()['inbounds']))
-                self.assertIn('默认 default', ask.call_args_list[1].args[0])
-                self.assertEqual(12, ask.call_count)
+                self.assertIn('默认 default', ask.call_args_list[2].args[0])
+                self.assertEqual(13, ask.call_count)
                 ports = {i['protocol']: (i['settings']['port'], i['settings']['public_port'])
                          for i in manager.store.read()['inbounds'].values()}
                 self.assertEqual({'reality': (443, 443), 'hysteria2': (443, 443),
@@ -111,7 +111,7 @@ class RealityTests(unittest.TestCase):
             engine = Mock()
             engine.keypair.return_value = ('private', 'public')
             ask = Mock(side_effect=[
-                'proxy.example', '', 'target.example', '', 'hy.example',
+                '1 2 3', 'proxy.example', '', 'target.example', '', 'hy.example',
                 'ws.example', '', '2443', '5443', '1', '8444', 'yes',
             ])
             with patch('sbmanager.system.network.public_addresses', return_value={}), \
@@ -129,7 +129,7 @@ class RealityTests(unittest.TestCase):
             engine = Mock()
             engine.keypair.return_value = ('private', 'public')
             ask = Mock(side_effect=[
-                'proxy.example', '', 'target.example', '', 'hy.example',
+                '1 2 3', 'proxy.example', '', 'target.example', '', 'hy.example',
                 'ws.example', '', '2443', '5443', '2', '8444', 'yes',
             ])
             with patch('sbmanager.system.network.public_addresses', return_value={}), \

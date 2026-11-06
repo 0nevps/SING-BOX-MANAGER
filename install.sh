@@ -18,6 +18,15 @@ flock -n 9 || { echo '另一个安装操作正在进行。请等待完成，不�
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fetch() { curl --proto '=https' --tlsv1.2 --retry 3 -fsSL "$1" -o "$2"; }
+open_menu() {
+    # The menu must not inherit installation locks or the curl pipeline's stdin.
+    exec 8>&- 9>&-
+    if ( : </dev/tty >/dev/tty ) 2>/dev/null; then
+        /usr/local/bin/sbmanager </dev/tty >/dev/tty
+    else
+        echo '当前没有交互终端，未打开菜单。请通过 SSH 登录后运行 sudo sbmanager。'
+    fi
+}
 if [[ -z "$version" ]]; then
     fetch "https://api.github.com/repos/$repo/releases/latest" "$tmp/release.json"
     version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$tmp/release.json")
@@ -62,7 +71,8 @@ chmod 700 "$tmp/sing-box"
 mkdir -p /opt/sbmanager/releases /var/lib/sbmanager /etc/sbmanager
 chmod 700 /var/lib/sbmanager /etc/sbmanager
 if [[ -e /opt/sbmanager/releases/$version ]]; then
-    echo '这个版本已经安装，无需重复安装，现有程序和数据保持不变。运行 sudo sbmanager 打开管理菜单。'
+    echo '这个版本已经安装，无需重复安装，现有程序和数据保持不变。'
+    open_menu
     exit 0
 fi
 old=$(readlink /opt/sbmanager/current || true)
@@ -159,4 +169,5 @@ if [[ $was_active -eq 1 ]]; then
     fi
 fi
 rollback_ready=0
-echo '程序安装完成。运行 sudo sbmanager 打开管理菜单；首次使用请完成设置，再选菜单 14 检查配置并启动服务。安装完成不代表节点或证书已可用，请再用客户端测试连接。'
+echo '程序安装完成，即将打开管理菜单，不会自动安装节点。需要时选择“节点管理 > 首次设置向导”，自行选择要安装的节点，再到“服务管理 > 检查配置并启动服务”。安装完成不代表节点或证书已可用，请再用客户端测试连接。'
+open_menu

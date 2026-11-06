@@ -12,7 +12,7 @@
 curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
 ```
 
-安装器会下载 GitHub Release 中的压缩包和 SHA-256 校验文件，检查下载文件是否一致。`v0.1.0` 是预发布版，必须明确写出版本号。安装完成后运行 `sudo sbmanager`；已在 root 终端中时可运行 `sbmanager`。
+安装器会下载 GitHub Release 中的压缩包和 SHA-256 校验文件，检查下载文件是否一致。`v0.1.0` 是预发布版，必须明确写出版本号。安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复安装同一版本完成检查后也会尝试打开主菜单。
 
 安装脚本的参数是 `OWNER/REPOSITORY` 和可选的 `v版本`。不指定版本时，会通过 GitHub API 选择最新稳定 Release，不会自动选择预发布版。安装脚本本身应来自已经审核的标签或提交。
 
@@ -31,9 +31,9 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/inst
 
 ## 第一次设置
 
-节点是手机或电脑连接的入口。没有节点数据时，运行 `sudo sbmanager` 会进入首次设置向导，创建三种节点和第一个用户。已有用户或节点时，向导不会覆盖数据，应使用管理菜单修改。
+节点是手机或电脑连接的入口。每次运行 `sudo sbmanager` 都先显示主菜单，没有节点数据时也不会自动进入安装。需要设置时，选择“1 节点管理 → 4 首次设置向导”，输入要安装的节点编号：`1 REALITY`、`2 Hysteria2`、`3 WebSocket`。可用空格或逗号分隔多选，例如 `1 3`；`0` 取消，留空不会默认安装全部。向导只创建选中的节点和第一个用户，并仅为该用户开通所选节点。已有用户或节点时，向导不会覆盖数据，应使用管理菜单修改。
 
-请先准备：
+按所选协议准备，未选协议无需填写：
 
 - VPS 的公网 IP 或域名。
 - REALITY 握手目标域名，以及 SNI（握手时使用、需要与目标证书匹配的域名）。SNI 直接回车会使用握手目标域名。

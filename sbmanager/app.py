@@ -26,10 +26,6 @@ def main():
         if args.system:
             deployment = Deployment(store, '/etc/sbmanager/config.json', engine, Systemd())
             store.deployment = deployment
-            if not store.read().get('inbounds'):
-                from sbmanager.modules.initialization import wizard
-                from sbmanager.cli import ask
-                wizard(Manager(store), engine, ask)
         return run(Manager(store), engine, deployment)
     except (OSError, ValueError) as error:
         parser.exit(1, f'启动失败: {error}\n')
