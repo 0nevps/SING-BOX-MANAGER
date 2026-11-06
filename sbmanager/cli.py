@@ -27,12 +27,13 @@ MENUS = (
                   '取消节点权限', '重置连接密钥', '删除用户', '导出客户端配置')),
     ('出口管理', ('查看出口', '添加 SOCKS5', '切换用户出口', '测试连接', '修改出口',
                   '移除已保存的出口', '删除出口')),
-    ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box')),
+    ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
+                  '更新管理程序', '卸载全部')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
     ('高级与帮助', ('查看原始设置 JSON', '术语帮助')),
 )
-DANGEROUS = {'删除用户', '删除出口'}
-CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box'}
+DANGEROUS = {'删除用户', '删除出口', '卸载全部'}
+CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序'}
 
 
 class Cancelled(Exception):
@@ -289,12 +290,27 @@ def service_action(action, manager, deployment):
         deployment.service.logs()
     elif action == 4:
         show_certificates(manager)
-    else:
+    elif action == 5:
         from sbmanager.system.kernel import upgrade
         version = ask('sing-box 版本（1.14.x，不加 v）')
         if confirm('将替换 sing-box 程序；运行中的服务会重启，连接可能短暂中断。'):
             upgrade(deployment, version)
             message('sing-box 已升级')
+    elif action == 6:
+        from sbmanager.system.maintenance import update
+        message('将从安装来源仓库 main 获取最新安装脚本；保留数据和配置。'
+                '安装器会确认更新，运行中的服务可能短暂中断。', tone='warning')
+        update()
+    elif action == 7:
+        from sbmanager.system.maintenance import uninstall, uninstall_paths
+        warning = ('卸载将停止并移除 sbmanager-sing-box.service，永久删除以下路径，'
+                   '包括全部用户、节点、密钥、证书缓存、备份和 sbmanager 指令：\n'
+                   + '\n'.join(str(path) for path in uninstall_paths())
+                   + '\n无法撤销。手动导出到其他目录的文件和系统依赖不会删除。')
+        if confirm(warning):
+            uninstall()
+            message('已卸载全部安装文件、数据、配置和 sbmanager 指令')
+            return True
 
 
 def backup_action(action, manager, deployment):
@@ -356,7 +372,8 @@ def run(manager, engine, deployment):
             elif section == 3:
                 egress_action(action, manager)
             elif section == 4:
-                service_action(action, manager, deployment)
+                if service_action(action, manager, deployment):
+                    return 0
             elif section == 5:
                 backup_action(action, manager, deployment)
             else:

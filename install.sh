@@ -13,13 +13,14 @@ case $(uname -m) in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; *) echo '�
 apt-get update
 apt-get install -y python3 ca-certificates curl tar iproute2 util-linux
 exec 9>/run/sbmanager-install.lock
-flock -n 9 || { echo '另一个安装操作正在进行。请等待完成，不要同时运行多个安装命令' >&2; exit 1; }
+flock -n 9 || { echo '另一个安装、更新或卸载操作正在进行。请等待完成后重试' >&2; exit 1; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fetch() { curl --proto '=https' --tlsv1.2 --retry 3 -fsSL "$1" -o "$2"; }
 open_menu() {
     # The menu must not inherit installation locks or the curl pipeline's stdin.
     exec 8>&- 9>&-
+    if [[ ${SBMANAGER_NO_MENU:-0} == 1 ]]; then return; fi
     if ( : </dev/tty >/dev/tty ) 2>/dev/null; then
         /usr/local/bin/sbmanager </dev/tty >/dev/tty
     else
@@ -157,6 +158,7 @@ install_dir=$(mktemp -d "/opt/sbmanager/builds/${commit:0:12}.XXXXXX")
 cp -R "$tmp/package/." "$install_dir/"
 install -m 755 "$tmp/sing-box" "$install_dir/sing-box"
 printf '%s\n' "$commit" > "$install_dir/.source-commit"
+printf '%s\n' "$repo" > "$install_dir/.source-repository"
 ln -s "$install_dir" /opt/sbmanager/current.new
 mv -Tf /opt/sbmanager/current.new /opt/sbmanager/current
 cat > /usr/local/bin/sbmanager <<'WRAPPER'

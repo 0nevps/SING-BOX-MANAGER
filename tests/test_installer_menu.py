@@ -41,6 +41,16 @@ class InstallerMenuTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual('运行 sudo sbmanager 打开菜单。\n', result.stdout)
 
+    def test_menu_update_can_skip_nested_menu_and_release_locks(self):
+        function = self.function.replace('/usr/local/bin/sbmanager', 'exit 99')
+        result = subprocess.run(
+            ['bash', '-c', function + '\nexec 8>/dev/null 9>/dev/null\n'
+             'SBMANAGER_NO_MENU=1 open_menu\n'
+             '[[ ! -e /dev/fd/8 && ! -e /dev/fd/9 ]]'],
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('', result.stdout)
+
     def test_installed_command_uses_service_entrypoint(self):
         wrapper = self.source.split("<<'WRAPPER'\n", 1)[1].split('\nWRAPPER', 1)[0]
         self.assertEqual(

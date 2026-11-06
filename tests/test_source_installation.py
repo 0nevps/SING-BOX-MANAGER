@@ -124,12 +124,13 @@ class SourceInstallationTests(unittest.TestCase):
             for commit in ('a' * 40, 'b' * 40, 'b' * 40):
                 (work / 'package' / 'main.py').write_text(commit)
                 result = subprocess.run(['bash', '-eu', '-c', textwrap.dedent(move) + '\n' + command],
-                                        env=dict(os.environ, tmp=str(work), commit=commit),
+                                        env=dict(os.environ, tmp=str(work), commit=commit, repo='owner/project'),
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(0, result.returncode, result.stderr)
                 current = (program / 'current').resolve()
                 self.assertEqual(commit, (current / 'main.py').read_text())
                 self.assertEqual(commit + '\n', (current / '.source-commit').read_text())
+                self.assertEqual('owner/project\n', (current / '.source-repository').read_text())
                 self.assertTrue((current / 'sing-box').stat().st_mode & 0o100)
                 directories.append(current)
             self.assertEqual(3, len(set(directories)))
