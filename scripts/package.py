@@ -17,7 +17,7 @@ root = Path(__file__).resolve().parents[1]
 output = Path(args.output)
 output.mkdir(parents=True, exist_ok=True)
 archive = output / f'sbmanager-{args.version}.tar.gz'
-paths = [root / p for p in ('main.py', 'install.sh', 'README.md', 'AGENTS.md', 'Sing-Box Manager.md')]
+paths = [root / p for p in ('main.py', 'install.sh', 'README.md', 'AGENTS.md')]
 paths += sorted((root / 'sbmanager').rglob('*.py'))
 paths += sorted((root / 'docs').glob('*.md'))
 with archive.open('wb') as raw:

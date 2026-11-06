@@ -1,6 +1,16 @@
 # 安装与升级
 
-当前为待 Linux 验收的开发版本，没有已发布的安装地址。
+当前发布的是待 Linux 验收的预发布版，仅用于独立测试机，尚未完成 systemd、证书和客户端连通性实测。
+
+## 测试机安装
+
+在 Debian 12/13 或 Ubuntu 22.04/24.04 的测试机执行（会修改系统软件包、systemd 和 `/opt/sbmanager` 等目录）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
+```
+
+先检查仓库中的安装脚本及发布产物。安装器使用 GitHub Release 中的压缩包及 SHA-256 校验文件；`v0.1.0` 是预发布版，必须显式指定版本。首次启动使用 `sudo sbmanager`。
 
 ## 本地开发
 
@@ -20,9 +30,9 @@ bash -n install.sh
 python3 scripts/package.py v0.1.0
 ```
 
-输出 `dist/sbmanager-v0.1.0.tar.gz` 和 `dist/SHA256SUMS`。GitHub 标签工作流运行测试并创建草稿 Release；完成 VALIDATION.md 中的 Linux 验收后再发布。
+输出 `dist/sbmanager-v0.1.0.tar.gz` 和 `dist/SHA256SUMS`。GitHub 标签工作流运行测试并创建预发布版 Release；完成 [验证记录](VALIDATION.md) 中的 Linux 验收后才能将其作为稳定版宣传。
 
-安装脚本参数为 `OWNER/REPOSITORY` 和可选的 `v版本`。仓库确定后，在 Linux root 终端执行下载脚本，传入实际仓库名。默认通过 GitHub API 选择稳定 Release；脚本本身应来自已审核版本。
+安装脚本参数为 `OWNER/REPOSITORY` 和可选的 `v版本`。默认通过 GitHub API 选择稳定 Release；预发布版需显式指定版本。脚本本身应来自已审核的标签或提交。
 
 安装器准备 Python、curl、CA、tar、iproute2 和 flock。内核固定为验证过的 1.14.4，并校验官方 GitHub 资产摘要。下载失败、缺少摘要、压缩包异常或配置不兼容时停止。
 

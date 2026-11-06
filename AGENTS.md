@@ -2,7 +2,7 @@
 
 ## Project structure & module organization
 
-The project has an implementation awaiting Linux acceptance. `Sing-Box Manager.md` is the authoritative V1 requirements document; `README.md` describes delivery and usage plans. CLI, configuration, deployment recovery, exports, installation, and tests exist; see `docs/VALIDATION.md` for unverified behavior.
+The project has an implementation awaiting Linux acceptance. The local, Git-ignored `Sing-Box Manager.md` contains the V1 requirements; public contributors should use `README.md` and `docs/VALIDATION.md` for published scope and outstanding checks. CLI, configuration, deployment recovery, exports, installation, and tests exist.
 
 Current and planned layout:
 

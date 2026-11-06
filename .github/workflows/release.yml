@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/package.py "$GITHUB_REF_NAME"
-      - name: Create draft release for deployment validation
+      - name: Create prerelease for deployment validation
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/* --prerelease --title "$GITHUB_REF_NAME (Linux validation pending)" --notes 'Development prerelease for Linux integration testing. systemd, ACME issuance, and real client connectivity are not yet validated. Do not use on a production VPS.'

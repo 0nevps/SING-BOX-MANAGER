@@ -2,11 +2,17 @@
 
 面向 Linux VPS 的 sing-box 服务端管理工具，通过交互式 CLI 管理入站、用户、出口、证书和配置。
 
-> **当前状态：开发版本，待 Linux 部署验收。** 已实现中文 CLI、初始化、用户授权、出口绑定、三种入站配置、部署事务与恢复、节点导出、证书诊断、备份及内核升级，并提供安装器和发布打包流程。21 项测试及官方 sing-box 1.14.4 配置校验通过；真实 systemd、ACME 和客户端连通性尚未验证，未发布可用安装地址。
+> **当前状态：开发预发布版，待 Linux 部署验收。** 已实现中文 CLI、初始化、用户授权、出口绑定、三种入站配置、部署事务与恢复、节点导出、证书诊断、备份及内核升级。真实 systemd、ACME 和客户端连通性尚未验证；请仅在独立的测试机上使用预发布版。
 
 ## 安装与使用
 
-开发完成并通过验收后，项目将发布到 GitHub，通过 GitHub Releases 分发版本包，并在此提供经过验证的一行安装命令。
+预发布版采用带 SHA-256 校验文件的 GitHub Release 分发。在独立的 Debian/Ubuntu 测试机上安装 v0.1.0：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/v0.1.0/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
+```
+
+安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。安装后运行 `sudo sbmanager`。请先查看[安装与升级](docs/INSTALLATION.md)及[待完成验收](docs/VALIDATION.md)；不指定版本时，安装器只选择 GitHub 最新的稳定版。
 
 预期使用流程：
 
@@ -49,8 +55,8 @@ V1 不包含 Web 面板、多 VPS 管理、流量计费、自动出口切换或 
 
 当前文档：
 
-- [需求文档与技术规格](Sing-Box%20Manager.md)：V1 范围、数据关系、安全约束和验收标准。
 - [贡献指南](AGENTS.md)：代码组织、命名、测试和提交要求。
+- [验证记录与待完成验收](docs/VALIDATION.md)：V1 验收条件及当前限制。
 
 主要代码结构：
 
@@ -72,7 +78,7 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 默认状态目录为 `~/.local/state/sbmanager-dev`，可用 `--state-dir /path/to/directory` 指定独立目录。目录包含敏感凭据，请勿放入仓库。菜单中先创建入站档案和用户，再使用列表显示的 ID 添加授权及绑定。状态保存不会部署或更新 sing-box 服务。
 
-测试覆盖授权隔离、绑定删除保护、凭据重置、禁用与删除、权限与显示脱敏、写入失败、多个进程并发更新和 CLI 操作。安装器实现后使用 `bash -n install.sh` 检查语法；安装、systemd、证书和协议连通性仍需在受支持的 Linux 环境验收。
+测试覆盖授权隔离、绑定删除保护、凭据重置、禁用与删除、权限与显示脱敏、写入失败、多个进程并发更新和 CLI 操作。使用 `bash -n install.sh` 和 ShellCheck 检查安装器；安装、systemd、证书和协议连通性仍需在受支持的 Linux 环境验收。
 
 ## 安全约定
 

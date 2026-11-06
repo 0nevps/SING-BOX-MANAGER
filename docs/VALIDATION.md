@@ -2,7 +2,7 @@
 
 ## 已完成的验证
 
-- 本机 macOS、Python 3.14.7：21 项 unittest 通过。
+- 本机 macOS、Python 3.14.7：25 项 unittest 通过，1 项需要指定官方 sing-box 二进制的测试跳过。
 - 官方 sing-box 1.14.4 macOS ARM64：三种入站合并配置及三种客户端出站通过 `sing-box check`。
 - `bash -n install.sh` 和 ShellCheck 通过。
 - 版本包生成和 SHA-256 文件生成通过；压缩包不包含状态、缓存或凭据。
@@ -20,7 +20,7 @@
 - REALITY、HY2、WS 三种客户端实际连接、多用户 auth_user 路由隔离及出口 IP 验证。
 - TCP-only 出口 UDP 阻断及支持 UDP 出口的 UDP ASSOCIATE 转发。
 - Linux 重启或进程强杀后的事务恢复，以及磁盘写满等故障注入。
-- GitHub Actions、真实 Release 下载地址和一行安装命令。
+- 公开 Release 下载地址和一行安装命令的 Linux 真机安装验证。
 
 ## 已知限制
 
