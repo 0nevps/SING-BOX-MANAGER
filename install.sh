@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-# Usage: bash install.sh OWNER/REPOSITORY [vMAJOR.MINOR.PATCH]
+# Usage: bash install.sh OWNER/REPOSITORY
 repo=${1:-}
-version=${2:-}
-[[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo '用法: bash install.sh OWNER/REPOSITORY [v版本]；例如 bash install.sh 0nevps/SING-BOX-MANAGER v0.1.0' >&2; exit 1; }
+[[ $# -eq 1 && "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo '用法: bash install.sh OWNER/REPOSITORY；例如 bash install.sh 0nevps/SING-BOX-MANAGER' >&2; exit 1; }
 [[ $(uname -s) == Linux && $EUID -eq 0 ]] || { echo '请在 Linux VPS 上使用 root 权限运行安装命令；普通用户请使用 sudo' >&2; exit 1; }
 # shellcheck disable=SC1091
 source /etc/os-release
@@ -28,40 +27,18 @@ open_menu() {
     fi
 }
 download_source() {
-    if [[ -z "$version" ]]; then
-        fetch "https://api.github.com/repos/$repo/git/matching-refs/tags/v" "$tmp/tags.json"
-        version=$(python3 -I - "$tmp/tags.json" <<'TAGS'
+    fetch "https://api.github.com/repos/$repo/git/ref/heads/main" "$tmp/ref.json"
+    commit=$(python3 -I - "$tmp/ref.json" <<'REFERENCE'
 import json, re, sys
 with open(sys.argv[1]) as stream:
-    refs = json.load(stream)
-versions = [ref['ref'].removeprefix('refs/tags/') for ref in refs
-            if re.fullmatch(r'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+', ref.get('ref', ''))]
-if not versions:
-    raise SystemExit('没有找到可安装的 tag，请先创建 v主版本.次版本.修订号 格式的 tag')
-print(max(versions, key=lambda value: tuple(map(int, value[1:].split('.')))))
-TAGS
-        )
-    fi
-    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'tag 格式不正确，请填写完整 tag，例如 v0.1.0' >&2; return 1; }
-    fetch "https://api.github.com/repos/$repo/git/ref/tags/$version" "$tmp/ref.json"
-    local object_type object_sha reference depth
-    for ((depth=0; depth<10; depth++)); do
-        reference=$(python3 -I - "$tmp/ref.json" <<'REFERENCE'
-import json, re, sys
-with open(sys.argv[1]) as stream:
-    obj = json.load(stream)['object']
-if obj.get('type') not in ('tag', 'commit') or not re.fullmatch(r'[0-9a-f]{40}', obj.get('sha', '')):
-    raise SystemExit('tag 未指向有效提交，已停止安装')
-print(obj['type'], obj['sha'])
+    obj = json.load(stream).get('object', {})
+if obj.get('type') != 'commit' or not re.fullmatch(r'[0-9a-f]{40}', obj.get('sha', '')):
+    raise SystemExit('main 分支未指向有效提交，已停止安装')
+print(obj['sha'])
 REFERENCE
-        )
-        read -r object_type object_sha <<<"$reference"
-        if [[ "$object_type" == commit ]]; then break; fi
-        fetch "https://api.github.com/repos/$repo/git/tags/$object_sha" "$tmp/ref.json"
-    done
-    [[ "$object_type" == commit ]] || { echo 'tag 引用层数过多，已停止安装' >&2; return 1; }
-    # Resolve once, then download the immutable commit rather than a movable tag.
-    fetch "https://codeload.github.com/$repo/tar.gz/$object_sha" "$tmp/package.tar.gz"
+    )
+    # Resolve main once so a concurrent push cannot change this download.
+    fetch "https://codeload.github.com/$repo/tar.gz/$commit" "$tmp/package.tar.gz"
     python3 -I - "$tmp" <<'SOURCE'
 import pathlib, shutil, sys, tarfile
 root = pathlib.Path(sys.argv[1])
@@ -97,7 +74,7 @@ with tarfile.open(root / 'package.tar.gz') as archive:
 SOURCE
 }
 download_source
-# Pin the engine independently of the manager's source tag.
+# Pin the engine independently of the manager's main branch.
 engine_version=1.14.4
 engine_name="sing-box-$engine_version-linux-$arch"
 fetch "https://github.com/SagerNet/sing-box/releases/download/v$engine_version/$engine_name.tar.gz" "$tmp/engine.tar.gz"
@@ -117,13 +94,8 @@ with tarfile.open(root/'engine.tar.gz') as archive:
 PY
 chmod 700 "$tmp/sing-box"
 "$tmp/sing-box" version | grep -q with_acme
-mkdir -p /opt/sbmanager/releases /var/lib/sbmanager /etc/sbmanager
+mkdir -p /opt/sbmanager/builds /var/lib/sbmanager /etc/sbmanager
 chmod 700 /var/lib/sbmanager /etc/sbmanager
-if [[ -e /opt/sbmanager/releases/$version ]]; then
-    echo '这个版本已经安装，无需重复安装，现有程序和数据保持不变。'
-    open_menu
-    exit 0
-fi
 old=$(readlink /opt/sbmanager/current || true)
 if [[ -f /var/lib/sbmanager/transaction.json ]]; then
     echo '上次修改尚未恢复完成，已停止安装。请先运行旧版 sudo sbmanager 尝试自动恢复；失败时检查服务日志，不要删除 transaction.json' >&2
@@ -137,7 +109,7 @@ if p.exists() and json.loads(p.read_text()).get('schema_version') != 1:
 CHECK_STATE
 if [[ -n "$old" ]]; then
     [[ -r /dev/tty ]] || { echo '升级需要在终端中输入确认，请通过 SSH 登录 VPS 后重新运行安装命令' >&2; exit 1; }
-    read -r -p "升级至 $version 会替换程序；服务运行时会重启，连接可能短暂中断。确认请输入 yes，其他输入取消: " answer </dev/tty
+    read -r -p "更新至 main 提交 ${commit:0:12} 会替换程序；服务运行时会重启，连接可能短暂中断。确认请输入 yes，其他输入取消: " answer </dev/tty
     [[ "$answer" == yes ]] || exit 0
 fi
 # Do not run package installation concurrently with manager mutations.
@@ -181,9 +153,11 @@ rollback_install() {
     rm -rf "$tmp"
 }
 trap rollback_install EXIT
-cp -R "$tmp/package" "/opt/sbmanager/releases/$version"
-install -m 755 "$tmp/sing-box" "/opt/sbmanager/releases/$version/sing-box"
-ln -s "/opt/sbmanager/releases/$version" /opt/sbmanager/current.new
+install_dir=$(mktemp -d "/opt/sbmanager/builds/${commit:0:12}.XXXXXX")
+cp -R "$tmp/package/." "$install_dir/"
+install -m 755 "$tmp/sing-box" "$install_dir/sing-box"
+printf '%s\n' "$commit" > "$install_dir/.source-commit"
+ln -s "$install_dir" /opt/sbmanager/current.new
 mv -Tf /opt/sbmanager/current.new /opt/sbmanager/current
 cat > /usr/local/bin/sbmanager <<'WRAPPER'
 #!/bin/sh
@@ -213,7 +187,7 @@ if [[ $was_active -eq 1 ]]; then
             mv -Tf /opt/sbmanager/current.rollback /opt/sbmanager/current
             systemctl restart sbmanager-sing-box.service
         fi
-        echo '升级未完成，已尝试恢复旧程序。请运行 sudo sbmanager，选择菜单 18 检查服务状态、菜单 19 查看日志' >&2
+        echo '升级未完成，已尝试恢复旧程序。请运行 sudo sbmanager，到“服务管理 > 查看状态”和“查看日志”检查' >&2
         exit 1
     fi
 fi

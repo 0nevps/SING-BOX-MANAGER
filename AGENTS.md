@@ -37,13 +37,13 @@ Tests use `unittest`; no coverage threshold is configured. Name files `test_*.py
 
 ## Commit & pull request guidelines
 
-No Git history is available to establish conventions. Write concise English imperative commit subjects, such as `fix: install from Git tags`. PRs should link relevant issues or requirements, explain behavior changes, and include validation results and sanitized CLI transcripts when useful.
+No Git history is available to establish conventions. Write concise English imperative commit subjects, such as `fix: install from main`. PRs should link relevant issues or requirements, explain behavior changes, and include validation results and sanitized CLI transcripts when useful.
 
-## Versioning & security requirements
+## Distribution & security requirements
 
-Version this project with Git tags only; do not create GitHub Releases or project release attachments. The installer accepts an optional `vMAJOR.MINOR.PATCH` tag. Without one, select the highest semantic version from GitHub's `git/matching-refs/tags/v` API. Resolve lightweight and annotated tags to commits, download source over HTTPS from `codeload.github.com/OWNER/REPO/tar.gz/COMMIT`, and validate archive contents before extraction. Do not require project `SHA256SUMS` files or local release packaging.
+Install and update directly from this repository's `main` branch. Do not create project Git tags, GitHub Releases, or release attachments. The installer accepts only `OWNER/REPOSITORY`. Resolve `main` to its current commit through GitHub's `git/ref/heads/main` API, download complete source over HTTPS from `codeload.github.com/OWNER/REPO/tar.gz/COMMIT`, and validate archive contents before extraction.
 
-Installation commands should fetch `install.sh` from `main`, even when selecting a source tag such as `v0.1.0`; historical tags do not necessarily contain later installer changes. Continue downloading sing-box from its official GitHub Releases and verifying official digests. Keep compatibility with the local `/opt/sbmanager/releases/` directory; its name does not imply GitHub Releases. The supported sing-box range is 1.14.x.
+Fetch `install.sh` from `main`. Each invocation downloads current source and installs into a fresh directory under `/opt/sbmanager/builds/`, then switches `/opt/sbmanager/current`. Record the source commit in `.source-commit`; do not skip updates because a previous installation exists. No legacy installation layout compatibility is required. Continue downloading sing-box from its official GitHub Releases and verifying official digests. The supported sing-box range is 1.14.x.
 
 Installation must prepare dependencies automatically and expose `sbmanager`; upgrades must preserve data and support rollback. Open the main menu after installation when an interactive terminal is available; let users select nodes explicitly instead of configuring all nodes by default. Do not describe unverified behavior as verified.
 

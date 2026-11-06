@@ -4,30 +4,24 @@
 
 使用 Debian 12/13 或 Ubuntu 22.04/24.04，并确保系统使用 systemd。安装需要 root 权限，会修改系统软件包、systemd 和 `/opt/sbmanager` 等目录。
 
-执行前，请先检查仓库中的安装脚本和目标 tag 的源码。确认后运行：
+执行前，请先检查仓库中的安装脚本和 `main` 源码。确认后运行：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
-安装脚本的参数是 `OWNER/REPOSITORY` 和可选的 `vMAJOR.MINOR.PATCH` tag。需要指定版本时，可在命令末尾追加 tag，例如：
+安装脚本只接收 `OWNER/REPOSITORY`，每次都获取该仓库 `main` 分支的当前源码，不需要版本参数或 tag，也不依赖本项目的 Release 附件。
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER v0.1.0
-```
+脚本先通过 GitHub API 获取 `main` 当前 commit，再通过 HTTPS 从 `codeload.github.com/OWNER/REPO/tar.gz/COMMIT` 下载完整源码，安全检查后解压。其中包含 `main.py` 和 `sbmanager/` 下的 Python 模块，不需要手动下载。固定 commit 仅用于确保本次安装内容一致，不影响下次更新获取新代码。
 
-脚本使用 `main` 分支中的安装逻辑；指定 tag 只决定下载哪个版本的源码，不表示历史 tag 已包含后续改动。请在执行前检查当前脚本。
+安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复运行安装器会重新获取源码，完成后也会打开主菜单。
 
-本项目只使用 Git tag 标记版本，不创建 GitHub Release，也不提供发布附件或 `SHA256SUMS`。不指定 tag 时，安装器通过 GitHub `git/matching-refs/tags/v` API 获取候选项，选择符合 `vMAJOR.MINOR.PATCH` 格式且语义版本最高的 tag，而不是按创建时间选择。轻量 tag 和附注 tag 都会解析到 commit，再通过 HTTPS 从 `codeload.github.com/OWNER/REPO/tar.gz/COMMIT` 下载源码，安全检查后解压。
-
-安装完成后，有交互终端时会打开主菜单，不会自动设置节点；无交互终端时会提示稍后运行 `sudo sbmanager`，已在 root 终端中时可运行 `sbmanager`。重复安装同一版本完成检查后也会尝试打开主菜单。
-
-安装器会准备 Python、curl、CA 证书、tar、iproute2 和 flock。sing-box 固定使用 1.14.4，兼容范围为 1.14.x；仍从 sing-box 官方 GitHub Release 下载，并按官方发布文件的摘要进行校验，这与本项目不创建 GitHub Release 无关。下载失败、缺少官方摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
+安装器会准备 Python、curl、CA 证书、tar、iproute2 和 flock。sing-box 固定使用 1.14.4，兼容范围为 1.14.x；仍从 sing-box 官方 GitHub Release 下载，并按官方发布文件的摘要进行校验，管理程序的更新不依赖这些发布文件。下载失败、缺少官方摘要、压缩包异常或已有配置与新版本不兼容时，安装会停止。
 
 ## 安装后文件放在哪里
 
-- `/opt/sbmanager/releases/`：按版本保存管理程序和 sing-box 的本地目录，保留此路径以兼容已有安装，与 GitHub Release 无关。
-- `/opt/sbmanager/current`：指向当前使用的程序版本。
+- `/opt/sbmanager/builds/`：每次安装或更新的程序目录，包含完整 Python 源码、sing-box 和 `.source-commit` 提交记录。
+- `/opt/sbmanager/current`：指向当前使用的程序目录。
 - `/usr/local/bin/sbmanager`：运行 `sbmanager` 时使用的命令入口。
 - `/var/lib/sbmanager/`：用户、节点和出口等管理数据，以及恢复记录、备份和 ACME 证书缓存。
 - `/etc/sbmanager/config.json`：程序生成的 sing-box 服务端配置。
@@ -62,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 ## 升级
 
-升级管理程序时，重新运行安装脚本并指定新版本。安装器会要求你在交互终端确认，并保留旧版本及数据备份。重复安装同一版本会保留已有部署，但脚本仍会先执行依赖准备和下载检查。
+更新管理程序时，重新运行上面的安装命令，自动获取 `main` 最新源码。安装器会要求你在交互终端确认，然后写入新的程序目录并切换 `current` 链接；即使提交未变化也不会跳过安装。用户、节点和配置不清空，旧程序目录及更新前的数据备份会保留。
 
 升级失败时，安装器会尝试恢复旧程序和原有服务设置。请检查服务状态和提示中的备份位置，不要把“尝试恢复”当作恢复成功的保证。
 

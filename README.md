@@ -12,15 +12,15 @@
 
 ## 安装与使用
 
-本项目使用 Git tag 标记版本，不创建 GitHub Release 或发布附件。安装器通过 GitHub API 选择 tag 并解析到 commit，再从 GitHub 下载对应源码。在 Debian/Ubuntu 上安装：
+安装和更新直接获取当前仓库 `main` 分支的完整源码，包括 Python 程序，无需手动下载其他文件。在 Debian/Ubuntu 上安装：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
-可在命令末尾附加明确的 `vMAJOR.MINOR.PATCH` tag，例如 `v0.1.0`；不指定时选择语义版本最高的 tag。脚本从 `main` 分支获取，指定 tag 只决定安装的源码版本，不表示该历史 tag 已包含后续改动。
+更新时重新运行相同命令，即可获取 `main` 最新代码。不需要指定版本，也不依赖本项目的 tag 或 Release。
 
-安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。执行前请先阅读[安装与升级](docs/INSTALLATION.md)，检查安装脚本和目标 tag 的源码。
+安装脚本会更改系统软件包、systemd 和 `/opt/sbmanager` 等目录。执行前请先阅读[安装与升级](docs/INSTALLATION.md)，检查安装脚本和 `main` 源码。
 
 使用步骤：
 
@@ -60,9 +60,9 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 安装器使用 Bash，负责安装程序和准备环境；管理程序使用 Python，负责菜单、用户、出口和配置。
 
-安装器接受可选的 `vMAJOR.MINOR.PATCH` tag；不指定时通过 GitHub `git/matching-refs/tags/v` API 选择语义版本最高的 tag。轻量 tag 和附注 tag 都会解析到 commit，再通过 HTTPS 从 `codeload.github.com/OWNER/REPO/tar.gz/COMMIT` 下载源码并安全检查解压。本项目不提供发布附件或 `SHA256SUMS`；sing-box 仍从其官方 GitHub Release 下载并按官方摘要校验。
+安装器只接收仓库名，通过 GitHub API 获取 `main` 当前提交，再通过 HTTPS 下载该提交的完整源码并安全检查解压。安装过程中即使仓库有新提交，本次下载仍固定在已选定的提交。sing-box 从其官方 GitHub Release 下载并按官方摘要校验。
 
-程序文件与管理数据、服务配置、备份分开保存。重复安装同一版本会保留已有部署；升级会保留旧版本和数据备份，失败时尝试恢复旧程序。恢复后请检查服务状态和数据。
+程序保存到 `/opt/sbmanager/builds/` 下独立目录，通过 `current` 链接切换。每次运行安装器都会获取当前源码，不会因已安装而跳过。用户、节点、服务配置和备份与程序分开保存；更新前保留旧程序和数据备份，失败时尝试恢复旧程序。恢复后请检查服务状态和数据。
 
 ## 项目结构与本地开发
 

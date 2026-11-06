@@ -43,6 +43,6 @@ class InstallerMenuTests(unittest.TestCase):
             self.assertIn('当前没有交互终端', result.stdout)
 
     def test_first_and_repeat_install_open_menu_after_success(self):
-        self.assertIn('    open_menu\n    exit 0\nfi', self.source)
+        self.assertNotIn('无需重复安装', self.source)
         completion = self.source[self.source.index('rollback_ready=0\n'):]
         self.assertTrue(completion.endswith('\nopen_menu\n'))
