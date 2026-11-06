@@ -2,8 +2,10 @@
 import getpass
 import json
 import os
+import shutil
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from sbmanager.modules.node_manager import configure, ask_inbound_ports, PROTOCOL_LABELS
 from sbmanager.modules.export_manager import export_user
@@ -54,6 +56,46 @@ def ask(label, tone='accent'):
     return input(styled(label, tone) + '\n' + styled('> ', 'accent')).strip()
 
 
+def menu_width():
+    """Leave one terminal column free to avoid automatic wrapping of rules."""
+    return max(1, min(56, shutil.get_terminal_size(fallback=(80, 24)).columns - 1))
+
+
+def menu_text(text, prefix='  ', tone=None):
+    """Wrap menu labels by display cells, including wide Chinese characters."""
+    width = menu_width()
+    line = prefix
+    cells = len(prefix)
+    for char in text:
+        size = 0 if unicodedata.combining(char) else 2 if unicodedata.east_asian_width(char) in 'WF' else 1
+        if cells + size > width and cells > len(prefix):
+            print(styled(line, tone) if tone else line)
+            line = ' ' * len(prefix)
+            cells = len(prefix)
+        line += char
+        cells += size
+    print(styled(line, tone) if tone else line)
+
+
+def menu_heading(title):
+    print()
+    print(styled('=' * menu_width(), 'accent'))
+    if title == '主菜单':
+        menu_text('SING-BOX MANAGER', tone='title')
+    menu_text(title, tone='section')
+    print(styled('-' * menu_width(), 'accent'))
+
+
+# Group labels without changing the established numeric shortcuts.
+MENU_GROUPS = {
+    '主菜单': {1: '配置管理', 4: '系统维护'},
+    '节点管理': {1: '节点配置', 5: '初始化'},
+    '用户管理': {1: '用户与授权', 6: '权限与密钥', 9: '客户端'},
+    '出口管理': {1: '线路配置', 6: '移除与清理'},
+    '服务管理': {1: '运行与诊断', 5: '更新与卸载'},
+}
+
+
 def choose(title, options, back='取消'):
     """Select a value by its visible number; zero never selects an object."""
     options = list(options)
@@ -61,13 +103,18 @@ def choose(title, options, back='取消'):
         message('暂无可选项', tone='warning')
         raise Cancelled
     while True:
-        print('\n' + styled(title, 'section'))
+        menu_heading(title)
+        groups = MENU_GROUPS.get(title, {}) if back != '取消' else {}
         for number, (_, label) in enumerate(options, 1):
-            tone = 'error' if label in DANGEROUS else 'warning' if label in CAUTION else None
-            line = f' {number} {label}'
-            print(styled(line, tone) if tone else styled(f' {number}', 'accent') + ' ' + label)
-        print('\n' + styled(f' 0 {back}', 'section'))
-        answer = ask('请选择')
+            if number in groups:
+                menu_text(f'[{groups[number]}]', tone='section')
+            tone = 'error' if label in DANGEROUS else 'warning' if label in CAUTION else 'accent'
+            suffix = ' [危险]' if label in DANGEROUS else ' [注意]' if label in CAUTION else ''
+            menu_text(label + suffix, prefix=f' {number:>2} ', tone=tone)
+        print(styled('-' * menu_width(), 'accent'))
+        menu_text(back, prefix='  0 ', tone='section')
+        print(styled('=' * menu_width(), 'accent'))
+        answer = ask(f'请选择 [0-{len(options)}]')
         if answer == '0':
             raise Cancelled
         if answer.isascii() and answer.isdecimal() and 1 <= int(answer) <= len(options):
@@ -112,8 +159,11 @@ def show_records(manager, kind):
     if not records:
         message('暂无记录', tone='warning')
         return
+    menu_heading({'inbounds': '节点列表', 'users': '用户列表', 'egress': '出口列表'}[kind])
     for number, record in enumerate(records.values(), 1):
-        print('\n' + styled(f'{number}. {record["name"]}', 'section'))
+        if number > 1:
+            print(styled('-' * menu_width(), 'accent'))
+        menu_text(f'{number}. {record["name"]}', tone='section')
         if kind == 'inbounds':
             settings = record.get('settings', {})
             print('  协议：' + PROTOCOL_LABELS[record['protocol']])
@@ -394,7 +444,6 @@ def advanced_action(action, manager):
 
 
 def run(manager, engine, deployment):
-    print('\n' + styled('SING-BOX MANAGER', 'title'))
     section = None
     while True:
         try:

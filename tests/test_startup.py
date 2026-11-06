@@ -26,7 +26,7 @@ class StartupTests(unittest.TestCase):
                  contextlib.redirect_stdout(output):
                 self.assertEqual(0, main())
             self.assertEqual(2, output.getvalue().count('主菜单'))
-            self.assertEqual(2, output.getvalue().count('\n节点管理\n'))
+            self.assertEqual(2, output.getvalue().count('\n  节点管理\n'))
             self.assertIn('选择要安装的节点', reader.call_args_list[2].args[0])
             engine.return_value.version.assert_not_called()
             self.assertFalse(store.path.exists())
@@ -56,7 +56,7 @@ class StartupTests(unittest.TestCase):
                 deployment.assert_called_once_with(
                     store, '/etc/sbmanager/config.json', engine, systemd.return_value)
                 self.assertIs(store.deployment, deployment.return_value)
-                self.assertTrue(output.getvalue().startswith('\nSING-BOX MANAGER\n\n主菜单\n'))
+                self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output.getvalue())
                 self.assertNotIn('首次设置：', output.getvalue())
                 self.assertEqual(1, reader.call_count)
                 wizard.assert_not_called()

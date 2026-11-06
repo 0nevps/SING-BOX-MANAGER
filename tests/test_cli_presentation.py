@@ -6,7 +6,7 @@ import re
 import unittest
 from unittest.mock import Mock, patch
 
-from sbmanager.cli import ask, run
+from sbmanager.cli import ask, choose, run
 
 
 class TerminalOutput(io.StringIO):
@@ -33,14 +33,16 @@ class CliPresentationTests(unittest.TestCase):
             self.assertIn(title, output)
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)
-        self.assertLessEqual(len(output.splitlines()), 14)
-        self.assertTrue(output.startswith('\nSING-BOX MANAGER\n\n主菜单\n'))
+        self.assertLessEqual(len(output.splitlines()), 18)
+        self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output)
+        self.assertIn('[配置管理]', output)
+        self.assertIn('[系统维护]', output)
 
     def test_submenu_returns_to_main(self):
         output, _ = self.run_menu(['2', '0', '0'])
         self.assertEqual(2, output.count('主菜单'))
-        self.assertIn('\n\n用户管理\n', output)
-        self.assertIn('\n 0 返回\n', output)
+        self.assertIn('\n  用户管理\n', output)
+        self.assertIn('\n  0 返回\n', output)
         self.assertIn('删除用户', output)
         self.assertNotIn('删除出口', output)
 
@@ -50,9 +52,9 @@ class CliPresentationTests(unittest.TestCase):
 
     def test_terminal_uses_semantic_colors(self):
         output, prompts = self.run_menu(['2', '0', '0'], TerminalOutput())
-        self.assertIn('\x1b[1;36mSING-BOX MANAGER\x1b[0m', output)
-        self.assertIn('\x1b[36m 1\x1b[0m 节点管理', output)
-        self.assertIn('\x1b[31m 8 删除用户\x1b[0m', output)
+        self.assertIn('\x1b[1;36m  SING-BOX MANAGER\x1b[0m', output)
+        self.assertIn('\x1b[36m  1 节点管理\x1b[0m', output)
+        self.assertIn('\x1b[31m  8 删除用户 [危险]\x1b[0m', output)
         self.assertIn('\x1b[36m', prompts)
 
     def test_no_color_and_dumb_terminal_disable_colors(self):
@@ -66,6 +68,34 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('\x1b[33m编号无效', output)
         self.assertIn('\x1b[32m用户已添加\x1b[0m', output)
         self.assertNotIn('本次操作已结束', output)
+
+    def test_danger_is_visible_without_color(self):
+        output, prompts = self.run_menu(['4', '0', '0'])
+        self.assertIn('卸载全部 [危险]', output)
+        self.assertIn('更新管理程序 [注意]', output)
+        self.assertIn('请选择 [0-7]', prompts)
+
+    def test_narrow_menu_wraps_chinese_without_losing_labels(self):
+        import unicodedata
+
+        output = io.StringIO()
+        label = '很长的节点名称 · VLESS + REALITY + Vision · example.com:443'
+        with patch('sbmanager.cli.shutil.get_terminal_size', return_value=os.terminal_size((24, 24))), \
+                patch('builtins.input', return_value='1'), contextlib.redirect_stdout(output):
+            self.assertEqual('node', choose('选择节点', [('node', label)]))
+        for line in output.getvalue().splitlines():
+            cells = sum(0 if unicodedata.combining(char) else
+                        2 if unicodedata.east_asian_width(char) in 'WF' else 1 for char in line)
+            self.assertLessEqual(cells, 23)
+        self.assertIn(''.join(label.split()), ''.join(output.getvalue().split()))
+
+    def test_menu_rendering_does_not_query_state_or_service(self):
+        manager, deployment = Mock(), Mock()
+        with patch('builtins.input', side_effect=['4', '0', '0']), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, run(manager, Mock(), deployment))
+        manager.store.read.assert_not_called()
+        deployment.service.active.assert_not_called()
 
     def test_input_starts_on_its_own_line_and_strips_whitespace(self):
         with patch('builtins.input', return_value='  value  ') as reader, \
