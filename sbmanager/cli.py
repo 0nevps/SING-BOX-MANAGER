@@ -160,8 +160,7 @@ def choose(title, options, back='取消', status=None):
                 print()
                 menu_text(f'[{groups[number]}]', tone='section')
             tone = 'error' if label in DANGEROUS else 'warning' if label in CAUTION else 'accent'
-            suffix = ' [危险]' if label in DANGEROUS else ' [注意]' if label in CAUTION else ''
-            menu_text(label + suffix, prefix=f'  {number:>2}) ', tone=tone,
+            menu_text(label, prefix=f'  {number:>2}) ', tone=tone,
                       prefix_tone='info' if tone == 'accent' else tone)
         print()
         menu_text(back, prefix='   0) ', tone='accent', prefix_tone='warning')

@@ -99,7 +99,10 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('\x1b[1;32mSING-BOX MANAGER · 主菜单\x1b[0m', output)
         self.assertIn('\x1b[32m' + '=' * 56 + '\x1b[0m', output)
         self.assertIn('\x1b[34m   1) \x1b[0m\x1b[32m节点管理\x1b[0m', output)
-        self.assertIn('\x1b[31m删除用户 [危险]\x1b[0m', output)
+        self.assertIn('\x1b[31m删除用户\x1b[0m', output)
+        self.assertIn('\x1b[33m取消节点权限\x1b[0m', output)
+        self.assertNotIn('[危险]', output)
+        self.assertNotIn('[注意]', output)
         self.assertIn('\x1b[33m   0) \x1b[0m', output)
         self.assertIn('\x1b[32m  请输入选项 [0-8]: \x1b[0m', prompts)
 
@@ -115,11 +118,17 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('\x1b[32m用户已添加\x1b[0m', output)
         self.assertNotIn('本次操作已结束', output)
 
-    def test_danger_is_visible_without_color(self):
-        output, prompts = self.run_menu(['8', '0', '7', '0', '0'])
-        self.assertIn('卸载全部 [危险]', output)
-        self.assertIn('更新管理程序 [注意]', output)
-        self.assertIn('开启 BBR [注意]', output)
+    def test_all_menus_omit_risk_suffixes_without_color(self):
+        answers = [answer for section in range(1, len(MENUS) + 1)
+                   for answer in (str(section), '0')] + ['0']
+        output, prompts = self.run_menu(answers)
+        self.assertNotIn('[危险]', output)
+        self.assertNotIn('[注意]', output)
+        self.assertNotIn('\x1b[', output)
+        for _, labels in MENUS:
+            for label in labels:
+                with self.subTest(label=label):
+                    self.assertRegex(output, rf'(?m)^ +\d+\) {re.escape(label)}$')
         self.assertIn('请输入选项 [0-8]: ', prompts)
 
     def test_narrow_menu_wraps_chinese_without_losing_labels(self):
