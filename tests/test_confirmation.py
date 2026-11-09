@@ -12,7 +12,7 @@ class ConfirmationTests(unittest.TestCase):
         for answer in ('y', 'Y', 'n', 'N', '', 'yes', 'invalid'):
             with self.subTest(answer=answer), patch('builtins.input', return_value=answer) as reader:
                 self.assertEqual(answer.lower() == 'y', confirm('测试确认'))
-                self.assertIn('[y/N]', reader.call_args.args[0])
+                self.assertEqual('测试确认\n确认？[y/N]\n> ', reader.call_args.args[0])
 
     def test_udp_requires_explicit_y(self):
         for protocol, link in (('socks5', 'socks5://host:1080'),
@@ -23,13 +23,15 @@ class ConfirmationTests(unittest.TestCase):
                     with patch('builtins.input', side_effect=[link, 'proxy', answer]) as reader:
                         edit_egress(manager)
                     self.assertEqual(answer.lower() == 'y', manager.save_egress.call_args.args[2]['udp'])
-                    self.assertIn('[y/N]', reader.call_args.args[0])
+                    self.assertEqual('支持 UDP？[y/N]\n> ', reader.call_args.args[0])
 
     def test_installer_confirmation_guard(self):
         installer = (Path(__file__).resolve().parents[1] / 'install.sh').read_text()
         guard = next(line.strip() for line in installer.splitlines()
                      if '[[ "$answer" ==' in line)
-        self.assertIn('[y/N]', installer)
+        prompt = next(line for line in installer.splitlines() if 'read -r -p' in line)
+        self.assertIn('确认？[y/N]: ', prompt)
+        self.assertNotIn('y 确认', prompt)
         for answer in ('y', 'Y', 'n', 'N', '', 'yes', 'invalid'):
             with self.subTest(answer=answer):
                 result = subprocess.run(
