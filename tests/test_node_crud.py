@@ -80,10 +80,57 @@ class NodeCrudTests(unittest.TestCase):
             self.action(2, ['2', '', '', 'invalid host', ''])
         self.assertEqual({}, self.store.read()['inbounds'])
 
+    def test_reality_add_asks_once_for_target_and_sni(self):
+        with patch('sbmanager.modules.node_manager.check_reality_target') as probe, \
+             patch('builtins.input', side_effect=['1', '', '', 'node.example', 'target.example']) as reader, \
+             contextlib.redirect_stdout(io.StringIO()):
+            node_action(2, self.manager, self.engine)
+        prompts = '\n'.join(call.args[0] for call in reader.call_args_list)
+        self.assertEqual(1, prompts.count('REALITY 目标网站域名'))
+        self.assertNotIn('SNI', prompts)
+        node = next(iter(self.store.read()['inbounds'].values()))
+        self.assertEqual('target.example', node['settings']['handshake'])
+        self.assertEqual('target.example', node['settings']['server_name'])
+        probe.assert_called_once_with('target.example', 'target.example', 443)
+
+    def test_reality_edit_updates_both_fields_and_preserves_keys_and_grants(self):
+        with patch('sbmanager.modules.node_manager.check_reality_target') as probe:
+            self.action(2, ['1', '', '', 'node.example', 'target.example'])
+            iid = next(iter(self.store.read()['inbounds']))
+            uid = self.manager.add_user('user')
+            self.manager.grant(uid, iid)
+            before = self.store.read()
+            self.action(3, ['1', '', '', 'new.example'])
+            settings = self.store.read()['inbounds'][iid]['settings']
+            self.assertEqual('new.example', settings['handshake'])
+            self.assertEqual('new.example', settings['server_name'])
+            probe.assert_called_with('new.example', 'new.example', 443)
+            for field in ('private_key', 'public_key', 'short_id'):
+                self.assertEqual(before['inbounds'][iid]['settings'][field], settings[field])
+            self.assertEqual(before['users'], self.store.read()['users'])
+            self.action(3, ['1', '', '', ''])
+        self.assertEqual(settings, self.store.read()['inbounds'][iid]['settings'])
+        self.engine.keypair.assert_called_once()
+
+    def test_reality_existing_separate_values_change_only_on_save(self):
+        values = dict(port=443, public_port=443, public_host='node.example',
+                      handshake='192.0.2.1', server_name='target.example')
+        with patch('sbmanager.modules.node_manager.check_reality_target') as probe:
+            iid = configure(self.manager, self.engine, None, values, name='node', protocol='reality')
+            before = self.store.path.read_bytes()
+            with self.assertRaises(Cancelled):
+                self.action(3, ['1', '', '', '0'])
+            self.assertEqual(before, self.store.path.read_bytes())
+            self.action(3, ['1', '', '', ''])
+            probe.assert_called_with('target.example', 'target.example', 443)
+        settings = self.store.read()['inbounds'][iid]['settings']
+        self.assertEqual('target.example', settings['handshake'])
+        self.assertEqual('target.example', settings['server_name'])
+
     def test_reality_probe_failure_leaves_no_node(self):
         with patch('sbmanager.modules.node_manager.check_reality_target', side_effect=ValueError('failed')):
             with self.assertRaises(ValueError):
-                self.action(2, ['1', '', '', 'node.example', 'target.example', ''])
+                self.action(2, ['1', '', '', 'node.example', 'target.example'])
         self.assertEqual({}, self.store.read()['inbounds'])
 
     def test_delete_confirmation_cleans_only_selected_node(self):

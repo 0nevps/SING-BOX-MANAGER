@@ -253,8 +253,8 @@ def edit_node(manager, engine, adding=False):
     values = {**previous, **ask_inbound_ports(node_field, protocol, previous),
               'public_host': node_field('公网 IP 或域名', previous.get('public_host', ''))}
     if protocol == 'reality':
-        values['handshake'] = node_field('REALITY 握手目标', previous.get('handshake', ''))
-        values['server_name'] = node_field('SNI', previous.get('server_name', values['handshake']))
+        target = node_field('REALITY 目标网站域名', previous.get('server_name') or previous.get('handshake', ''))
+        values['handshake'] = values['server_name'] = target
     else:
         values['server_name'] = node_field('证书域名', previous.get('server_name', values['public_host']))
         if protocol == 'cloudflare_ws':
