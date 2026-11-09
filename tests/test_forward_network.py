@@ -1,9 +1,10 @@
+import errno
 import socket
 import unittest
 from types import SimpleNamespace
 from unittest.mock import call, patch
 
-from sbmanager.security import ValidationError
+from sbmanager.security import PortInUse, ValidationError
 from sbmanager.system.network import check_available
 from sbmanager.system.systemd import Systemd
 
@@ -41,6 +42,44 @@ class ForwardNetworkTests(unittest.TestCase):
         factory.return_value.__enter__.return_value.bind.side_effect = [None, OSError()]
         with self.assertRaises(ValidationError):
             check_available(direct())
+
+    def test_occupied_protocol_reports_address_and_port(self):
+        for address in ('127.0.0.1', '::1'):
+            for protocol in ('tcp', 'udp'):
+                with self.subTest(address=address, protocol=protocol), patch(
+                        'sbmanager.system.network.socket.socket') as factory:
+                    factory.return_value.__enter__.return_value.bind.side_effect = OSError(
+                        errno.EADDRINUSE, 'Address already in use')
+                    with self.assertRaises(PortInUse) as raised:
+                        check_available(direct(address, protocol))
+                    self.assertIn(f'{protocol.upper()} [{address}]:9000', str(raised.exception))
+
+    @patch('sbmanager.system.network.socket.socket')
+    def test_both_detects_udp_conflict_after_free_tcp(self, factory):
+        factory.return_value.__enter__.return_value.bind.side_effect = [
+            None, OSError(errno.EADDRINUSE, 'Address already in use')]
+        with self.assertRaisesRegex(PortInUse, 'UDP'):
+            check_available(direct())
+
+    @patch('sbmanager.system.network.socket.socket')
+    def test_non_conflict_bind_failure_is_not_reported_as_occupied(self, factory):
+        factory.return_value.__enter__.return_value.bind.side_effect = OSError(
+            errno.EADDRNOTAVAIL, 'Cannot assign requested address')
+        with self.assertRaises(ValidationError) as raised:
+            check_available(direct())
+        self.assertNotIsInstance(raised.exception, PortInUse)
+
+    def test_real_occupied_tcp_and_udp_ports(self):
+        for protocol, kind in (('tcp', socket.SOCK_STREAM), ('udp', socket.SOCK_DGRAM)):
+            with self.subTest(protocol=protocol), socket.socket(socket.AF_INET, kind) as occupied:
+                occupied.bind(('127.0.0.1', 0))
+                if protocol == 'tcp':
+                    occupied.listen()
+                config = direct('127.0.0.1', protocol)
+                config['inbounds'][0]['listen_port'] = occupied.getsockname()[1]
+                with self.assertRaises(PortInUse):
+                    check_available(config)
+            check_available(config)
 
     @patch('sbmanager.system.network.socket.socket')
     def test_existing_nodes_and_acme(self, factory):

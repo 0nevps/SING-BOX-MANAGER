@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from sbmanager.cli import run
+from sbmanager.cli import Cancelled, forward_action, run
 from sbmanager.core.config_builder import build
 from sbmanager.core.state_manager import StateStore
 from sbmanager.core.transaction_manager import Deployment
@@ -115,7 +115,8 @@ class ForwardingTests(unittest.TestCase):
         answers = ['4', '2', 'DNS', '', '15353', '1.1.1.1', '53', '', '1',
                    '3', '1', 'n', '0', '0']
         output = io.StringIO()
-        with patch('builtins.input', side_effect=answers), contextlib.redirect_stdout(output):
+        with patch('builtins.input', side_effect=answers), patch('sbmanager.cli.check_available'), \
+                contextlib.redirect_stdout(output):
             self.assertEqual(0, run(self.manager, Mock(), Mock()))
         self.assertIn('TCP + UDP', output.getvalue())
         self.assertEqual(1, len(self.store.read()['forwards']))
@@ -123,6 +124,63 @@ class ForwardingTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             run(self.manager, Mock(), Mock())
         self.assertEqual({}, self.store.read()['forwards'])
+
+    def test_cli_occupied_port_retries_without_restarting_or_losing_fields(self):
+        import errno
+        self.manager.add_forward(self.values)
+        self.deploy()
+        before = self.store.path.read_bytes(), self.deployment.config_path.read_bytes()
+        answers = ['NAS', '0.0.0.0', '56565', 'nas.example.com', '56565', '',
+                   '56566', '56567']
+        output = io.StringIO()
+        with patch('builtins.input', side_effect=answers) as prompt, \
+                patch('sbmanager.system.network.socket.socket') as factory, \
+                patch.object(self.service, 'restart', wraps=self.service.restart) as restart, \
+                contextlib.redirect_stdout(output):
+            def bind(address):
+                if address[1] in (56565, 56566):
+                    self.assertEqual(before, (self.store.path.read_bytes(),
+                                              self.deployment.config_path.read_bytes()))
+                    restart.assert_not_called()
+                    raise OSError(errno.EADDRINUSE, 'Address already in use')
+            factory.return_value.__enter__.return_value.bind.side_effect = bind
+            forward_action(2, self.manager)
+        entry, = (record for record in self.store.read()['forwards'].values() if record['name'] == 'NAS')
+        self.assertEqual({'name': 'NAS', 'listen': '0.0.0.0', 'listen_port': 56567,
+                          'target': 'nas.example.com', 'target_port': 56565, 'network': 'both'},
+                         {key: value for key, value in entry.items() if key != 'id'})
+        restart.assert_called_once()
+        self.assertEqual(3, sum('监听端口' in args[0] for args, _ in prompt.call_args_list))
+        self.assertIn('TCP [0.0.0.0]:56565', output.getvalue())
+        self.assertIn('已被占用', output.getvalue())
+
+    def test_cli_occupied_port_can_cancel_without_changes(self):
+        import errno
+        self.manager.add_forward(self.values)
+        self.deploy()
+        before = self.store.path.read_bytes(), self.deployment.config_path.read_bytes()
+        with patch('builtins.input', side_effect=['NAS', '', '56565', 'nas.example.com',
+                                                 '56565', '', '0']), \
+                patch('sbmanager.system.network.socket.socket') as factory, \
+                patch.object(self.service, 'restart') as restart, \
+                contextlib.redirect_stdout(io.StringIO()):
+            factory.return_value.__enter__.return_value.bind.side_effect = OSError(
+                errno.EADDRINUSE, 'Address already in use')
+            with self.assertRaises(Cancelled):
+                forward_action(2, self.manager)
+        restart.assert_not_called()
+        self.assertEqual(before, (self.store.path.read_bytes(), self.deployment.config_path.read_bytes()))
+
+    def test_cli_saved_port_conflict_retries_before_binding(self):
+        self.manager.add_forward({**self.values, 'network': 'tcp'})
+        with patch('builtins.input', side_effect=['NAS', '127.0.0.1', '15353',
+                                                 'nas.example.com', '56565', '2', '15354']), \
+                patch('sbmanager.system.network.socket.socket') as factory, \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            forward_action(2, self.manager)
+        factory.return_value.__enter__.return_value.bind.assert_called_once_with(('127.0.0.1', 15354))
+        self.assertIn('冲突', output.getvalue())
+        self.assertEqual(2, len(self.store.read()['forwards']))
 
     @unittest.skipUnless(os.environ.get('SING_BOX_TEST_BINARY'), 'set SING_BOX_TEST_BINARY for official engine check')
     def test_official_engine(self):

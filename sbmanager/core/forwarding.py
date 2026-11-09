@@ -1,7 +1,7 @@
 """Validation and configuration for fixed-destination TCP/UDP forwarding."""
 import ipaddress
 from sbmanager.egress.drivers.common import endpoint
-from sbmanager.security import ValidationError, text
+from sbmanager.security import PortInUse, ValidationError, text
 
 
 def validate_forward(values):
@@ -43,7 +43,7 @@ def validate_forwards(state):
         for network in networks:
             pair = (network, values['listen_port'])
             if pair in occupied:
-                raise ValidationError(f'端口转发与节点、其他转发或证书验证端口冲突：{network.upper()} {pair[1]}')
+                raise PortInUse(f'端口转发与节点、其他转发或证书验证端口冲突：{network.upper()} [{values["listen"]}]:{pair[1]}')
             occupied.add(pair)
 
 

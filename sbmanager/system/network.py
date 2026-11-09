@@ -1,7 +1,8 @@
+import errno
 import ipaddress
 import socket
 import urllib.request
-from sbmanager.security import ValidationError
+from sbmanager.security import PortInUse, ValidationError
 
 
 def public_addresses():
@@ -42,7 +43,9 @@ def check_available(config):
                 if family == socket.AF_INET6:
                     sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
                 sock.bind((address, port))
-        except OSError:
+        except OSError as error:
+            if error.errno == errno.EADDRINUSE:
+                raise PortInUse(f'监听端口已被占用：{protocol.upper()} [{address}]:{port}') from None
             raise ValidationError(f'无法使用端口 {port}，可能已被其他程序占用或当前权限不足。请检查端口占用、root 权限和系统网络设置') from None
 
 

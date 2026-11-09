@@ -10,6 +10,9 @@ from sbmanager.modules.node_manager import configure, ask_inbound_ports, PROTOCO
 from sbmanager.modules.export_manager import export_user
 from sbmanager.modules.certificate_manager import inspect
 from sbmanager.core.transaction_manager import atomic_write, encode
+from sbmanager.core.forwarding import validate_forward, validate_forwards
+from sbmanager.security import PortInUse, identifier
+from sbmanager.system.network import check_available
 from sbmanager.egress.registry import driver
 from sbmanager.egress.links import parse_link
 from sbmanager.system import bbr
@@ -423,9 +426,25 @@ def forward_action(action, manager):
         choice = node_field('协议：1 TCP + UDP，2 TCP，3 UDP', '1')
         if choice not in ('1', '2', '3'):
             raise ValueError('请选择 1、2 或 3')
-        manager.add_forward({'name': name, 'listen': listen, 'listen_port': port,
-                             'target': target, 'target_port': target_port,
-                             'network': {'1': 'both', '2': 'tcp', '3': 'udp'}[choice]})
+        while True:
+            values = validate_forward({'name': name, 'listen': listen, 'listen_port': port,
+                                       'target': target, 'target_port': target_port,
+                                       'network': {'1': 'both', '2': 'tcp', '3': 'udp'}[choice]})
+            try:
+                state = manager.store.read()
+                key = identifier()
+                state.setdefault('forwards', {})[key] = {**values, 'id': key}
+                validate_forwards(state)
+                # Probe only the new listener; existing listeners may belong to our running service.
+                listener = {'type': 'direct', 'listen': values['listen'], 'listen_port': port}
+                if values['network'] != 'both':
+                    listener['network'] = values['network']
+                check_available({'inbounds': [listener]})
+                manager.add_forward(values)
+                break
+            except PortInUse as error:
+                message(f'{error}。请重新输入监听端口，输入 0 取消', tone='warning')
+                port = int(node_field('监听端口'))
         message('转发已保存；首次使用请到“服务管理”检查配置并启动服务')
     elif action == 3:
         key = choose('删除转发', ((key, f'{r["name"]} · {r["network"]} · [{r["listen"]}]:{r["listen_port"]}')
