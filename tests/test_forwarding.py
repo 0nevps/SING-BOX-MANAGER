@@ -111,6 +111,26 @@ class ForwardingTests(unittest.TestCase):
             self.deployment.restore(backup)
         self.assertIn(key, self.store.read()['forwards'])
 
+    def test_cli_list_numbers_forwards_and_preserves_details(self):
+        for index, network in enumerate(('both', 'tcp', 'udp')):
+            self.manager.add_forward({**self.values, 'name': f'DNS-{network}',
+                                      'network': network, 'listen_port': 15353 + index})
+        before = self.store.path.read_bytes()
+        with patch('sbmanager.cli.menu_width', return_value=160), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            forward_action(1, self.manager)
+        self.assertEqual([
+            '   1) DNS-both · TCP + UDP · [127.0.0.1]:15353 转发到 [1.1.1.1]:53 · 直连',
+            '   2) DNS-tcp · TCP · [127.0.0.1]:15354 转发到 [1.1.1.1]:53 · 直连',
+            '   3) DNS-udp · UDP · [127.0.0.1]:15355 转发到 [1.1.1.1]:53 · 直连',
+        ], output.getvalue().splitlines())
+        self.assertEqual(before, self.store.path.read_bytes())
+
+    def test_cli_list_empty_forwards(self):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            forward_action(1, self.manager)
+        self.assertEqual('暂无端口转发\n', output.getvalue())
+
     def test_cli_add_list_cancel_delete(self):
         answers = ['4', '2', 'DNS', '', '', '15353', '1.1.1.1', '53', '1',
                    '4', '1', 'n', '0', '0']

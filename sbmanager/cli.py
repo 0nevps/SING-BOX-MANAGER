@@ -412,10 +412,11 @@ def forward_action(action, manager):
     if action == 1:
         if not records:
             message('暂无端口转发', tone='warning')
-        for record in records.values():
+        for number, record in enumerate(records.values(), 1):
             network = 'TCP + UDP' if record['network'] == 'both' else record['network'].upper()
-            print(f'{record["name"]} · {network} · [{record["listen"]}]:{record["listen_port"]}'
-                  f' 转发到 [{record["target"]}]:{record["target_port"]} · 直连')
+            menu_text(f'{record["name"]} · {network} · [{record["listen"]}]:{record["listen_port"]}'
+                      f' 转发到 [{record["target"]}]:{record["target_port"]} · 直连',
+                      prefix=f'  {number:>2}) ', tone='accent', prefix_tone='info')
     elif action in (2, 3):
         key, previous = None, {}
         if action == 3:
