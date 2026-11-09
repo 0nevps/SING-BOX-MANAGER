@@ -6,7 +6,7 @@ import re
 import unittest
 from unittest.mock import Mock, patch
 
-from sbmanager.cli import ask, choose, run
+from sbmanager.cli import Cancelled, MENUS, ask, choose, run
 
 
 class TerminalOutput(io.StringIO):
@@ -24,19 +24,20 @@ class CliPresentationTests(unittest.TestCase):
             self.assertEqual(0, run(manager, Mock(), Mock()))
         return output.getvalue(), '\n'.join(call.args[0] for call in reader.call_args_list)
 
-    def test_main_menu_has_seven_categories_and_exit(self):
+    def test_main_menu_has_eight_categories_and_exit(self):
         output, _ = self.run_menu(['0'])
         options = re.findall(r'^ +(\d+) (.+)$', output, re.MULTILINE)
-        self.assertEqual([str(number) for number in (1, 2, 3, 4, 5, 6, 7, 0)],
+        self.assertEqual([str(number) for number in (1, 2, 3, 4, 5, 6, 7, 8, 0)],
                          [number for number, _ in options])
-        for title in ('节点管理', '用户管理', '出口管理', '服务管理', '备份与恢复', '高级与帮助', '端口转发'):
-            self.assertIn(title, output)
+        self.assertEqual(['节点管理', '用户管理', '出口管理', '端口转发', '服务管理',
+                          '备份与恢复', '网络设置', '更新与卸载', '退出'],
+                         [label for _, label in options])
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)
-        self.assertLessEqual(len(output.splitlines()), 20)
+        self.assertLessEqual(len(output.splitlines()), 22)
         self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output)
-        self.assertIn('[配置管理]', output)
-        self.assertIn('[系统维护]', output)
+        self.assertEqual(['业务配置', '运行与维护', '系统设置'],
+                         re.findall(r'^  \[(.+)\]$', output, re.MULTILINE))
 
     def test_menu_rules_are_short_on_wide_terminals(self):
         with patch('sbmanager.cli.shutil.get_terminal_size', return_value=os.terminal_size((120, 24))):
@@ -52,6 +53,38 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('\n  0 返回\n', output)
         self.assertIn('删除用户', output)
         self.assertNotIn('删除出口', output)
+
+    def test_submenus_are_flat_and_network_labels_are_concise(self):
+        for title, labels in MENUS:
+            with self.subTest(title=title), patch('builtins.input', return_value='0'), \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                with self.assertRaises(Cancelled):
+                    choose(title, enumerate(labels, 1), back='返回')
+                self.assertNotRegex(output.getvalue(), r'(?m)^  \[.+\]$')
+        self.assertEqual(('节点流量仅用 IPv4', '开启 BBR'), MENUS[6][1])
+
+    def test_every_menu_number_dispatches_to_its_matching_action(self):
+        handlers = ('node_action', 'user_action', 'egress_action', 'forward_action',
+                    'service_action', 'backup_action', 'network_action', 'maintenance_action')
+        for section, (_, labels) in enumerate(MENUS, 1):
+            for action in range(1, len(labels) + 1):
+                with self.subTest(section=section, action=action), contextlib.ExitStack() as stack:
+                    mocks = [stack.enter_context(patch('sbmanager.cli.' + name, return_value=None))
+                             for name in handlers]
+                    manager, engine, deployment = Mock(), Mock(), Mock()
+                    stack.enter_context(patch('builtins.input',
+                                              side_effect=[str(section), str(action), '0', '0']))
+                    stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                    self.assertEqual(0, run(manager, engine, deployment))
+                    for index, handler in enumerate(mocks, 1):
+                        if index != section:
+                            handler.assert_not_called()
+                        elif section == 1:
+                            handler.assert_called_once_with(action, manager, engine)
+                        elif section in (5, 6, 8):
+                            handler.assert_called_once_with(action, manager, deployment)
+                        else:
+                            handler.assert_called_once_with(action, manager)
 
     def test_redirected_output_has_no_color_codes(self):
         output, prompts = self.run_menu(['0'])
@@ -77,7 +110,7 @@ class CliPresentationTests(unittest.TestCase):
         self.assertNotIn('本次操作已结束', output)
 
     def test_danger_is_visible_without_color(self):
-        output, prompts = self.run_menu(['4', '0', '0'])
+        output, prompts = self.run_menu(['8', '0', '7', '0', '0'])
         self.assertIn('卸载全部 [危险]', output)
         self.assertIn('更新管理程序 [注意]', output)
         self.assertIn('开启 BBR [注意]', output)
@@ -99,7 +132,7 @@ class CliPresentationTests(unittest.TestCase):
 
     def test_only_main_menu_queries_live_status_without_reading_state(self):
         manager, deployment = Mock(), Mock()
-        with patch('builtins.input', side_effect=['4', '0', '0']), \
+        with patch('builtins.input', side_effect=['5', '0', '0']), \
                 patch('sbmanager.cli.bbr.enabled', return_value=False) as enabled, \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(0, run(manager, Mock(), deployment))

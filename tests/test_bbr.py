@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from sbmanager.cli import run, service_action
+from sbmanager.cli import network_action, run
 from sbmanager.core.transaction_manager import atomic_write
 from sbmanager.security import ValidationError
 from sbmanager.system import bbr
@@ -178,17 +178,17 @@ class BbrMenuTests(unittest.TestCase):
         for answer in ('', 'n', 'no', 'y', 'Y'):
             with self.subTest(answer=answer), patch('builtins.input', return_value=answer) as reader, \
                     patch('sbmanager.cli.bbr.enable') as enable, \
+                    patch('sbmanager.system.systemd.Systemd.restart') as restart, \
                     contextlib.redirect_stdout(io.StringIO()) as output:
-                deployment = Mock()
-                service_action(8, Mock(), deployment)
+                network_action(2, Mock())
                 self.assertEqual(answer.lower() == 'y', enable.called)
                 self.assertIn('/etc/sysctl.d/99-sbmanager-bbr.conf', reader.call_args.args[0])
                 self.assertIn('全机 TCP', reader.call_args.args[0])
-                deployment.service.restart.assert_not_called()
+                restart.assert_not_called()
                 self.assertEqual(answer.lower() == 'y', 'BBR 已开启' in output.getvalue())
 
     def test_enable_failure_has_no_success_message_and_menu_stays_usable(self):
-        with patch('builtins.input', side_effect=['4', '8', 'y', '0', '0']), \
+        with patch('builtins.input', side_effect=['7', '2', 'y', '0', '0']), \
                 patch('sbmanager.cli.bbr.enable', side_effect=ValidationError('内核不支持 BBR')), \
                 patch('sbmanager.cli.bbr.enabled', return_value=False), \
                 contextlib.redirect_stdout(io.StringIO()) as output:
@@ -199,7 +199,7 @@ class BbrMenuTests(unittest.TestCase):
     def test_top_status_refreshes_after_returning_to_main_menu(self):
         deployment = Mock()
         deployment.service.active.side_effect = [False, True]
-        with patch('builtins.input', side_effect=['4', '8', 'y', '0', '0']), \
+        with patch('builtins.input', side_effect=['7', '2', 'y', '0', '0']), \
                 patch('sbmanager.cli.bbr.enable') as enable, \
                 patch('sbmanager.cli.bbr.enabled', side_effect=[False, True]) as enabled, \
                 contextlib.redirect_stdout(io.StringIO()) as output:
@@ -209,7 +209,7 @@ class BbrMenuTests(unittest.TestCase):
         self.assertIn('BBR：已开启', text)
         self.assertIn('sing-box 服务：未运行', text)
         self.assertIn('sing-box 服务：运行中', text)
-        self.assertLess(text.index('BBR：未开启'), text.index('[配置管理]'))
+        self.assertLess(text.index('BBR：未开启'), text.index('[业务配置]'))
         enable.assert_called_once_with()
         self.assertEqual(2, enabled.call_count)
         self.assertEqual(2, deployment.service.active.call_count)

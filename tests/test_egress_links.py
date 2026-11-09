@@ -89,7 +89,7 @@ class EgressLinkTests(unittest.TestCase):
         with patch('builtins.input', side_effect=[
                 '1', 'ss://' + b64('aes-128-gcm:secret') + '@host:8388', '', 'y']), \
                 contextlib.redirect_stdout(io.StringIO()):
-            egress_action(5, self.manager)
+            egress_action(3, self.manager)
         profile = self.manager.store.read()['egress'][key]
         self.assertEqual('ss', profile['protocol'])
         self.assertTrue(profile['settings']['udp'])

@@ -35,9 +35,9 @@ class CliWordingTests(unittest.TestCase):
             'server': 'proxy.example.com', 'port': 1080,
             'username': 'alice', 'password': 'secret', 'udp': False})
 
-    def test_advanced_menu_rejects_removed_help_option(self):
+    def test_network_menu_rejects_removed_help_option(self):
         before = self.store.path.read_bytes()
-        output, prompts = self.run_menu(['6', '3', '0', '0'])
+        output, prompts = self.run_menu(['7', '3', '0', '0'])
         self.assertNotIn('术语帮助', output)
         self.assertNotIn('独立的连接身份', output)
         self.assertIn('编号无效', output)
@@ -48,7 +48,7 @@ class CliWordingTests(unittest.TestCase):
         before = self.store.path.read_bytes()
         deployment = Mock()
         deployment.service.active.return_value = True
-        output, _ = self.run_menu(['4', '1', '0', '0'], deployment)
+        output, _ = self.run_menu(['5', '1', '0', '0'], deployment)
         self.assertEqual(3, deployment.service.active.call_count)
         self.assertIn('服务运行中', output)
         self.assertEqual(before, self.store.path.read_bytes())
@@ -71,7 +71,7 @@ class CliWordingTests(unittest.TestCase):
     def test_direct_is_explicit_and_keeps_saved_egress(self):
         egress = self.add_proxy()
         self.manager.bind(self.user, self.node, egress)
-        output, prompts = self.run_menu(['3', '3', '1', '1', '', '1', '0', '0'])
+        output, prompts = self.run_menu(['3', '5', '1', '1', '', '1', '0', '0'])
         self.assertIn('1 直连（DIRECT）', output)
         self.assertIn('编号无效', output)
         self.assertNotIn('ID', prompts)
@@ -84,7 +84,7 @@ class CliWordingTests(unittest.TestCase):
         deployment.backups = Path(self.temp.name) / 'backups'
         deployment.backups.mkdir()
         (deployment.backups / 'backup.json').touch()
-        output, prompts = self.run_menu(['5', '3', '1', 'no', '0', '0'], deployment)
+        output, prompts = self.run_menu(['6', '3', '1', 'no', '0', '0'], deployment)
         self.assertIn('backup.json', output)
         self.assertIn('替换当前用户、节点、出口和配置，并重启服务', prompts)
         self.assertIn('当前设置会另存备份', prompts)
@@ -92,16 +92,16 @@ class CliWordingTests(unittest.TestCase):
 
     def test_upgrade_cancellation_warns_and_does_not_upgrade(self):
         with patch('sbmanager.system.kernel.upgrade') as upgrade:
-            _, prompts = self.run_menu(['4', '5', '1.14.4', 'no', '0', '0'], Mock())
+            _, prompts = self.run_menu(['8', '2', '1.14.4', 'no', '0', '0'], Mock())
         self.assertIn('连接可能短暂中断', prompts)
         self.assertIn('不加 v', prompts)
         upgrade.assert_not_called()
 
     def test_enable_and_disable_use_numbered_choices(self):
-        _, prompts = self.run_menu(['2', '5', '1', '2', '0', '0'])
+        _, prompts = self.run_menu(['2', '4', '1', '2', '0', '0'])
         self.assertFalse(self.store.read()['users'][self.user]['enabled'])
         self.assertNotIn('enable', prompts)
-        self.run_menu(['2', '5', '1', '1', '0', '0'])
+        self.run_menu(['2', '4', '1', '1', '0', '0'])
         self.assertTrue(self.store.read()['users'][self.user]['enabled'])
 
     def test_duplicate_username_explains_how_to_continue(self):
@@ -124,13 +124,13 @@ class CliWordingTests(unittest.TestCase):
 
     def test_ungranted_nodes_are_not_offered_for_binding(self):
         self.manager.add_inbound('not-allowed', 'hysteria2')
-        output, _ = self.run_menu(['3', '3', '1', '0', '0', '0'])
+        output, _ = self.run_menu(['3', '5', '1', '0', '0', '0'])
         self.assertIn('REALITY', output)
         self.assertNotIn('not-allowed', output)
 
     def test_grant_only_offers_ungranted_nodes(self):
         other = self.manager.add_inbound('HY2', 'hysteria2')
-        self.run_menu(['2', '4', '1', '1', '0', '0'])
+        self.run_menu(['2', '5', '1', '1', '0', '0'])
         self.assertIn(other, self.store.read()['users'][self.user]['grants'])
 
     def test_add_node_uses_numbered_protocol_and_short_prompts(self):
@@ -179,9 +179,9 @@ class CliWordingTests(unittest.TestCase):
         self.assertNotIn('secret', output)
         self.assertNotIn('grants', output)
 
-    def test_advanced_json_remains_available_and_redacted(self):
+    def test_service_json_remains_available_and_redacted(self):
         self.add_proxy()
-        output, _ = self.run_menu(['6', '1', '0', '0'])
+        output, _ = self.run_menu(['5', '5', '0', '0'])
         self.assertIn('"users":', output)
         self.assertIn(self.user, output)
         self.assertNotIn('secret', output)
@@ -206,7 +206,7 @@ class CliWordingTests(unittest.TestCase):
 
     def test_selecting_another_user_does_not_modify_first_user(self):
         second = self.manager.add_user('Bob')
-        self.run_menu(['2', '5', '2', '2', '0', '0'])
+        self.run_menu(['2', '4', '2', '2', '0', '0'])
         state = self.store.read()
         self.assertTrue(state['users'][self.user]['enabled'])
         self.assertFalse(state['users'][second]['enabled'])
@@ -225,7 +225,7 @@ class CliWordingTests(unittest.TestCase):
     def test_egress_creation_edit_test_and_deletion(self):
         self.run_menu(['3', '2', 'socks5://user:hidden@proxy.example.com:1080',
                        'proxy', '', '0', '0'])
-        self.run_menu(['3', '5', '1', 'socks5://user:hidden@other.example.com:1081',
+        self.run_menu(['3', '3', '1', 'socks5://user:hidden@other.example.com:1081',
                        'updated', 'y', '0', '0'])
         profile = next(iter(self.store.read()['egress'].values()))
         self.assertEqual('updated', profile['name'])
@@ -245,8 +245,8 @@ class CliWordingTests(unittest.TestCase):
         deployment.backups = Path(self.temp.name) / 'backups'
         deployment.backups.mkdir()
         (deployment.backups / 'old.json').touch()
-        output, _ = self.run_menu(['4', '1', '2', '3', '0',
-                                   '5', '1', '2', '3', '1', 'y', '4', '2', 'y', '0', '0'], deployment)
+        output, _ = self.run_menu(['5', '1', '2', '3', '0',
+                                   '6', '1', '2', '3', '1', 'y', '4', '2', 'y', '0', '0'], deployment)
         deployment.service.logs.assert_called_once()
         deployment.backup.assert_called_once()
         deployment.restore.assert_called_once_with('old.json')
@@ -260,7 +260,7 @@ class CliWordingTests(unittest.TestCase):
         result = {'domains': [{'domain': 'node.example', 'addresses': ['192.0.2.1']}],
                   'certificates': [{'file': 'node.crt', 'expires': 'Jan 1 2030'}]}
         with patch('sbmanager.cli.inspect', return_value=result):
-            output, _ = self.run_menu(['4', '4', '0', '0'], Mock())
+            output, _ = self.run_menu(['5', '4', '0', '0'], Mock())
         self.assertIn('域名：node.example', output)
         self.assertIn('到期：Jan 1 2030', output)
         self.assertIn('检查范围：DNS、本地证书', output)
@@ -270,7 +270,7 @@ class CliWordingTests(unittest.TestCase):
     def test_backup_retention_cancellation_does_not_prune(self):
         before = self.store.path.read_bytes()
         deployment = Mock()
-        self.run_menu(['5', '4', '1', 'no', '0', '0'], deployment)
+        self.run_menu(['6', '4', '1', 'no', '0', '0'], deployment)
         deployment.prune.assert_not_called()
         self.assertEqual(before, self.store.path.read_bytes())
 

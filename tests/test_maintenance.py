@@ -191,13 +191,13 @@ class MaintenanceMenuTests(unittest.TestCase):
 
     def test_update_menu_calls_installer_bridge(self):
         with patch.object(maintenance, 'update') as update:
-            output, _ = self.menu(['4', '6', '0', '0'])
+            output, _ = self.menu(['8', '1', '0', '0'])
         update.assert_called_once_with()
         self.assertIn('更新管理程序', output)
 
     def test_uninstall_cancel_does_not_remove_files(self):
         with patch.object(maintenance, 'uninstall') as uninstall:
-            _, prompts = self.menu(['4', '7', 'no', '0', '0'])
+            _, prompts = self.menu(['8', '3', 'no', '0', '0'])
         uninstall.assert_not_called()
         for path in maintenance.uninstall_paths():
             self.assertIn(str(path), prompts)
@@ -206,13 +206,13 @@ class MaintenanceMenuTests(unittest.TestCase):
 
     def test_uninstall_success_exits_without_reopening_menu(self):
         with patch.object(maintenance, 'uninstall') as uninstall:
-            output, _ = self.menu(['4', '7', 'y'])
+            output, _ = self.menu(['8', '3', 'y'])
         uninstall.assert_called_once_with()
         self.assertIn('已卸载', output)
         self.assertEqual(1, output.count('主菜单'))
 
     def test_uninstall_failure_is_not_reported_as_success(self):
         with patch.object(maintenance, 'uninstall', side_effect=OSError('stop failed')):
-            output, _ = self.menu(['4', '7', 'y', '0', '0'])
+            output, _ = self.menu(['8', '3', 'y', '0', '0'])
         self.assertIn('操作未完成', output)
         self.assertNotIn('已卸载', output)

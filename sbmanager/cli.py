@@ -24,15 +24,15 @@ STYLES = {
 }
 MENUS = (
     ('节点管理', ('查看节点', '添加节点', '修改节点', '删除节点')),
-    ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '开通节点', '启用或停用',
+    ('用户管理', ('查看用户', '添加用户', '添加用户并开通全部节点', '启用或停用用户', '开通节点',
                   '取消节点权限', '重置连接密钥', '删除用户')),
-    ('出口管理', ('查看出口', '添加出口', '切换用户出口', '测试连接', '修改出口',
+    ('出口管理', ('查看出口', '添加出口', '修改出口', '测试连接', '切换用户出口',
                   '移除已保存的出口', '删除出口')),
-    ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
-                  '更新管理程序', '卸载全部', '开启 BBR')),
-    ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
-    ('高级与帮助', ('查看原始设置 JSON', '仅使用 IPv4 访问网络')),
     ('端口转发', ('查看转发', '添加转发', '删除转发')),
+    ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '查看原始设置 JSON')),
+    ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
+    ('网络设置', ('节点流量仅用 IPv4', '开启 BBR')),
+    ('更新与卸载', ('更新管理程序', '升级 sing-box', '卸载全部')),
 )
 DANGEROUS = {'删除节点', '删除用户', '删除出口', '删除转发', '卸载全部'}
 CAUTION = {'取消节点权限', '重置连接密钥', '从备份恢复', '设置保留数量', '升级 sing-box', '更新管理程序', '开启 BBR'}
@@ -87,13 +87,9 @@ def menu_heading(title):
     print(styled('-' * min(32, menu_width()), 'accent'))
 
 
-# Group labels without changing the established numeric shortcuts.
+# Keep grouping on the main menu; submenus remain short numbered lists.
 MENU_GROUPS = {
-    '主菜单': {1: '配置管理', 4: '系统维护'},
-    '节点管理': {1: '节点配置', 5: '初始化'},
-    '用户管理': {1: '用户与授权', 6: '权限与密钥'},
-    '出口管理': {1: '线路配置', 6: '移除与清理'},
-    '服务管理': {1: '运行与诊断', 5: '更新与卸载'},
+    '主菜单': {1: '业务配置', 5: '运行与维护', 7: '系统设置'},
 }
 
 
@@ -302,9 +298,9 @@ def user_action(action, manager):
         else:
             manager.add_user_all(name)
         message('用户已添加' if action == 2 else '用户已添加，已开通全部节点')
-    elif action in (4, 6, 7):
-        uid, iid = user_node(manager, granted=action != 4)
-        if action == 4:
+    elif action in (5, 6, 7):
+        uid, iid = user_node(manager, granted=action != 5)
+        if action == 5:
             manager.grant(uid, iid)
             message('节点已开通')
         elif action == 6:
@@ -316,7 +312,7 @@ def user_action(action, manager):
             message('连接密钥已重置')
     else:
         uid = select_record(manager.store.read()['users'], '选择用户', 'users')
-        if action == 5:
+        if action == 4:
             enabled = choose('用户状态', ((True, '启用'), (False, '停用（不能连接，保留设置）')))
             manager.set_enabled(uid, enabled)
             message('用户已启用' if enabled else '用户已停用')
@@ -343,10 +339,10 @@ def egress_action(action, manager):
     elif action == 2:
         edit_egress(manager)
         message('出口已添加')
-    elif action in (3, 6):
+    elif action in (5, 6):
         uid, iid = user_node(manager)
         state = manager.store.read()
-        if action == 3:
+        if action == 5:
             options = [(None, '直连（DIRECT）')]
             options.extend((key, record['name'] + f' · {record["settings"]["server"]}:{record["settings"]["port"]}')
                            for key, record in state['egress'].items())
@@ -366,7 +362,7 @@ def egress_action(action, manager):
         if action == 4:
             result = driver(profile['protocol']).test_connection(profile)
             message(result['note'], tone='warning')
-        elif action == 5:
+        elif action == 3:
             edit_egress(manager, profile)
             message('出口已保存')
         elif confirm('删除出口后无法直接撤销。'):
@@ -433,17 +429,22 @@ def service_action(action, manager, deployment):
     elif action == 4:
         show_certificates(manager)
     elif action == 5:
+        print(json.dumps(manager.summary(), ensure_ascii=False, indent=2))
+
+
+def maintenance_action(action, manager, deployment):
+    if action == 1:
+        from sbmanager.system.maintenance import update
+        message('将从安装来源仓库 main 获取最新安装脚本；保留数据和配置。'
+                '安装器会确认更新，运行中的服务可能短暂中断。', tone='warning')
+        update()
+    elif action == 2:
         from sbmanager.system.kernel import upgrade
         version = ask('sing-box 版本（1.14.x，不加 v）')
         if confirm('将替换 sing-box 程序；运行中的服务会重启，连接可能短暂中断。'):
             upgrade(deployment, version)
             message('sing-box 已升级')
-    elif action == 6:
-        from sbmanager.system.maintenance import update
-        message('将从安装来源仓库 main 获取最新安装脚本；保留数据和配置。'
-                '安装器会确认更新，运行中的服务可能短暂中断。', tone='warning')
-        update()
-    elif action == 7:
+    elif action == 3:
         from sbmanager.system.maintenance import uninstall, uninstall_paths
         warning = ('卸载将停止并移除 sbmanager-sing-box.service，永久删除以下路径，'
                    '包括全部用户、节点、密钥、证书缓存、备份和 sbmanager 指令：\n'
@@ -453,12 +454,6 @@ def service_action(action, manager, deployment):
             uninstall()
             message('已卸载全部安装文件、数据、配置和 sbmanager 指令')
             return True
-    elif action == 8:
-        if confirm('将修改全机 TCP 默认拥塞控制为 BBR、默认队列为 fq，并写入 '
-                   '/etc/sysctl.d/99-sbmanager-bbr.conf 持久保存；影响不只限于 sing-box。'
-                   '不更换内核，不重启服务。'):
-            bbr.enable()
-            message('BBR 已开启，fq / bbr 运行参数已检查，重启配置已保存')
 
 
 def backup_action(action, manager, deployment):
@@ -489,27 +484,32 @@ def backup_action(action, manager, deployment):
             message('备份保留数量已更新')
 
 
-def advanced_action(action, manager):
+def network_action(action, manager):
     if action == 1:
-        print(json.dumps(manager.summary(), ensure_ascii=False, indent=2))
-    elif action == 2:
         state = manager.store.read()
         enabled = state.get('direct_ipv4_only', False)
         menu_text('当前状态：' + ('已开启' if enabled else '已关闭'))
         menu_text('开启后，使用 VPS 本机出口的所有节点仅通过 IPv4 访问网站和其他目标；'
                   '无法访问仅支持 IPv6 的目标。')
+        menu_text('不修改服务器全局网络设置。')
         menu_text('不影响客户端通过 IPv6 连接节点，不影响端口转发；'
                   '使用代理出口的流量不受此设置控制。')
-        selected = choose('仅使用 IPv4 访问网络', ((True, '开启'), (False, '关闭')))
+        selected = choose('节点流量仅用 IPv4', ((True, '开启'), (False, '关闭')))
         if selected == enabled:
             message('设置未改变')
             return
         status = '开启' if selected else '关闭'
-        if confirm(f'将{status}“仅使用 IPv4 访问网络”。已部署时会检查配置并重启服务，连接可能短暂中断。'):
+        if confirm(f'将{status}“节点流量仅用 IPv4”。已部署时会检查配置并重启服务，连接可能短暂中断。'):
             manager.set_direct_ipv4_only(selected)
-            message('仅使用 IPv4 访问网络已' + status)
+            message('节点流量仅用 IPv4已' + status)
             if not state.get('deployed'):
                 message('设置已保存；首次使用请到“服务管理”检查配置并启动服务', tone='warning')
+    elif action == 2:
+        if confirm('将修改全机 TCP 默认拥塞控制为 BBR、默认队列为 fq，并写入 '
+                   '/etc/sysctl.d/99-sbmanager-bbr.conf 持久保存；影响不只限于 sing-box。'
+                   '不更换内核，不重启服务。'):
+            bbr.enable()
+            message('BBR 已开启，fq / bbr 运行参数已检查，重启配置已保存')
 
 
 def run(manager, engine, deployment):
@@ -533,14 +533,16 @@ def run(manager, engine, deployment):
             elif section == 3:
                 egress_action(action, manager)
             elif section == 4:
-                if service_action(action, manager, deployment):
-                    return 0
+                forward_action(action, manager)
             elif section == 5:
+                service_action(action, manager, deployment)
+            elif section == 6:
                 backup_action(action, manager, deployment)
             elif section == 7:
-                forward_action(action, manager)
-            else:
-                advanced_action(action, manager)
+                network_action(action, manager)
+            elif section == 8:
+                if maintenance_action(action, manager, deployment):
+                    return 0
         except Cancelled:
             if section is None:
                 return 0

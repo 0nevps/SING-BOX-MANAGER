@@ -112,14 +112,14 @@ class ForwardingTests(unittest.TestCase):
         self.assertIn(key, self.store.read()['forwards'])
 
     def test_cli_add_list_cancel_delete(self):
-        answers = ['7', '2', 'DNS', '', '15353', '1.1.1.1', '53', '', '1',
+        answers = ['4', '2', 'DNS', '', '15353', '1.1.1.1', '53', '', '1',
                    '3', '1', 'n', '0', '0']
         output = io.StringIO()
         with patch('builtins.input', side_effect=answers), contextlib.redirect_stdout(output):
             self.assertEqual(0, run(self.manager, Mock(), Mock()))
         self.assertIn('TCP + UDP', output.getvalue())
         self.assertEqual(1, len(self.store.read()['forwards']))
-        with patch('builtins.input', side_effect=['7', '3', '1', 'y', '0', '0']), \
+        with patch('builtins.input', side_effect=['4', '3', '1', 'y', '0', '0']), \
                 contextlib.redirect_stdout(io.StringIO()):
             run(self.manager, Mock(), Mock())
         self.assertEqual({}, self.store.read()['forwards'])

@@ -161,8 +161,8 @@ class IPv4OnlyTests(unittest.TestCase):
         self.assertNotIn('dns', json.loads(self.deployment.config_path.read_text()))
 
     def test_cli_status_enable_disable_and_confirmation(self):
-        output, prompts = self.run_menu(['6', '2', '1', 'y', '2', '2', 'y', '0', '0'])
-        self.assertIn('仅使用 IPv4 访问网络', output)
+        output, prompts = self.run_menu(['7', '1', '1', 'y', '1', '2', 'y', '0', '0'])
+        self.assertIn('节点流量仅用 IPv4', output)
         self.assertIn('当前状态：已关闭', output)
         self.assertIn('当前状态：已开启', output)
         self.assertIn('代理出口的流量不受此设置控制', ''.join(output.split()))
@@ -173,9 +173,9 @@ class IPv4OnlyTests(unittest.TestCase):
 
     def test_cli_cancel_and_noop_do_not_write(self):
         before = self.store.path.read_bytes()
-        for answers in (['6', '2', '0', '0', '0'],
-                        ['6', '2', '1', 'n', '0', '0'],
-                        ['6', '2', '2', '0', '0']):
+        for answers in (['7', '1', '0', '0', '0'],
+                        ['7', '1', '1', 'n', '0', '0'],
+                        ['7', '1', '2', '0', '0']):
             with self.subTest(answers=answers):
                 self.run_menu(answers)
                 self.assertEqual(before, self.store.path.read_bytes())
@@ -184,9 +184,9 @@ class IPv4OnlyTests(unittest.TestCase):
         self.deploy()
         self.service.fail_once = True
         before = self.store.path.read_bytes()
-        output, _ = self.run_menu(['6', '2', '1', 'y', '0', '0'])
+        output, _ = self.run_menu(['7', '1', '1', 'y', '0', '0'])
         self.assertIn('操作未完成', output)
-        self.assertNotIn('仅使用 IPv4 访问网络已开启', output)
+        self.assertNotIn('节点流量仅用 IPv4已开启', output)
         self.assertEqual(before, self.store.path.read_bytes())
 
     @unittest.skipUnless(os.environ.get('SING_BOX_TEST_BINARY'),
