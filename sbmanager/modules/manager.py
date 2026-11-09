@@ -2,7 +2,7 @@
 from sbmanager.security import ValidationError, text, identifier, credential
 from sbmanager.egress.registry import driver
 
-PROTOCOLS = ('reality', 'hysteria2', 'cloudflare_ws')
+PROTOCOLS = ('reality', 'hysteria2', 'cloudflare_ws', 'anytls')
 
 
 def require(mapping, key, label):
@@ -32,7 +32,7 @@ class Manager:
 
     def add_inbound(self, name, protocol):
         if protocol not in PROTOCOLS:
-            raise ValidationError('节点协议不支持。请输入 reality、hysteria2 或 cloudflare_ws')
+            raise ValidationError('节点协议不支持。请输入 reality、hysteria2、cloudflare_ws 或 anytls')
         entry = {'id': identifier(), 'name': text(name, '节点名称'), 'protocol': protocol}
         def change(state):
             state['inbounds'][entry['id']] = entry

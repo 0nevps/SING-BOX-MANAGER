@@ -19,12 +19,12 @@ def export_user(state, user_id, inbound_id=None):
         host = settings['public_host']
         port = settings.get('public_port', settings['port'])
         tls = {'enabled': True, 'server_name': settings['server_name']}
-        node = {'type': 'hysteria2' if protocol == 'hysteria2' else 'vless',
+        node = {'type': protocol if protocol in ('hysteria2', 'anytls') else 'vless',
                 'tag': iid, 'server': host, 'server_port': port, 'tls': tls}
         params = {'sni': settings['server_name']}
-        if protocol == 'hysteria2':
+        if protocol in ('hysteria2', 'anytls'):
             node['password'] = secret
-            scheme = 'hysteria2'
+            scheme = protocol
         else:
             node['uuid'] = secret
             scheme = 'vless'
@@ -40,7 +40,8 @@ def export_user(state, user_id, inbound_id=None):
                 params.update({'path': settings['path'], 'host': settings['server_name']})
         outbounds.append(node)
         address = f'[{host}]' if ':' in host else host
-        links.append(f'{scheme}://{quote(secret, safe="")}@{address}:{port}?{urlencode(params)}#{quote(inbound["name"], safe="")}')
+        path = '/' if protocol == 'anytls' else ''
+        links.append(f'{scheme}://{quote(secret, safe="")}@{address}:{port}{path}?{urlencode(params)}#{quote(inbound["name"], safe="")}')
     if not outbounds:
         raise ValidationError('这个用户还不能使用任何节点。请先到“用户管理 > 开通节点”授权，再查看节点分享链接')
     return {'links': links, 'config': {'inbounds': [{'type': 'mixed', 'tag': 'local', 'listen': '127.0.0.1', 'listen_port': 2080}],

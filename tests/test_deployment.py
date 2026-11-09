@@ -133,7 +133,7 @@ class DeploymentTests(unittest.TestCase):
         engine = SingBox(os.environ['SING_BOX_TEST_BINARY'])
         engine.version()
         state = self.store.read()
-        for protocol, port in [('hysteria2', 1443), ('cloudflare_ws', 8443)]:
+        for protocol, port in [('hysteria2', 1443), ('cloudflare_ws', 8443), ('anytls', 2443)]:
             iid = self.manager.add_inbound(protocol, protocol)
             self.manager.grant(self.user, iid)
             def setup(current):

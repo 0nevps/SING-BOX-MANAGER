@@ -18,4 +18,4 @@ def identifier():
 
 
 def credential(protocol):
-    return secrets.token_urlsafe(24) if protocol == 'hysteria2' else identifier()
+    return secrets.token_urlsafe(24) if protocol in ('hysteria2', 'anytls') else identifier()

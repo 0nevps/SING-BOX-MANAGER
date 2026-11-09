@@ -24,7 +24,7 @@ def validate_state(state):
                 if iid not in state['inbounds'] or not isinstance(secret, str) or not secret:
                     raise ValueError()
         for key, inbound in state['inbounds'].items():
-            if inbound['id'] != key or inbound['protocol'] not in ('reality', 'hysteria2', 'cloudflare_ws'):
+            if inbound['id'] != key or inbound['protocol'] not in ('reality', 'hysteria2', 'cloudflare_ws', 'anytls'):
                 raise ValueError()
         for key, profile in state['egress'].items():
             from sbmanager.egress.registry import driver

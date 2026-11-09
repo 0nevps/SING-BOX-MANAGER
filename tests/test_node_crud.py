@@ -124,7 +124,7 @@ class NodeCrudTests(unittest.TestCase):
 
     def test_view_links_match_export_and_exclude_disabled_users(self):
         from sbmanager.modules.export_manager import export_user
-        for protocol in ('reality', 'hysteria2', 'cloudflare_ws'):
+        for protocol in ('reality', 'hysteria2', 'cloudflare_ws', 'anytls'):
             values = dict(port=443, public_port=443, public_host='2001:db8::1',
                           handshake='target.example', server_name='target.example', path='/test')
             with patch('sbmanager.modules.node_manager.check_reality_target'):

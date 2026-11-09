@@ -6,7 +6,7 @@
 
 ## 先认识节点、用户和出口
 
-- **节点（手机或电脑连接的入口）**：本工具提供 REALITY、Hysteria2 和 WebSocket 三种节点。
+- **节点（手机或电脑连接的入口）**：本工具提供 REALITY、Hysteria2、WebSocket 和 AnyTLS 四种节点。
 - **用户**：可以单独设置节点使用权限、启用或停用的连接身份。
 - **出口（VPS 访问网络时使用的线路）**：同一个用户在不同节点上，可以使用不同出口。
 - **直连（DIRECT，不经过代理出口）**：让 VPS 直接访问网络。
@@ -145,7 +145,7 @@
 | `users` | 用户列表；每个用户的 `id` 是用户 ID，`name` 是用户名。 |
 | `inbounds` | 节点列表；每个节点的 `id` 是节点 ID，旧提示中的“入站 ID”也是它。 |
 | `egress` | 出口列表；每个出口的 `id` 是出口 ID。 |
-| `protocol` | 协议名称：`reality`、`hysteria2`、`cloudflare_ws` 或出口的 `http`、`socks5`、`ss`。 |
+| `protocol` | 协议名称：`reality`、`hysteria2`、`cloudflare_ws`、`anytls` 或出口的 `http`、`socks5`、`ss`。 |
 | `enabled` | 用户是否启用：`true` 是启用，`false` 是停用。 |
 | `grants` | 该用户获准使用的节点 ID 列表，不显示连接密钥。 |
 | `bindings` | 用户在各节点上的出口设置，包含 `user_id`、`inbound_id`、`saved` 和 `active`。 |
@@ -177,6 +177,7 @@
 
 - REALITY 默认 TCP 443，手机或电脑直接连接这个端口。
 - Hysteria2 默认 UDP 443，手机或电脑直接连接这个端口。
+- AnyTLS 默认 TCP 443，手机或电脑直接连接 VPS；与 REALITY 或其他 TCP 节点共存时需要不同的 TCP 端口。
 - WebSocket 先选择直接连接 VPS，还是经过 Cloudflare 代理，再填写 VPS 端口，默认 TCP 8443。直接连接 VPS 时，客户端使用相同端口；经过 Cloudflare 时，客户端连接 HTTPS 443，需要你自行在 Cloudflare 设置回源到 VPS 所填端口的规则。
 
 这里的“直接连接 VPS”是手机到 VPS 的连接方式，与 VPS 访问网络时使用的直连出口是两回事。程序只生成节点配置，不会自动设置 Cloudflare。
@@ -184,6 +185,18 @@
 修改旧配置时，如果已有不同的客户端端口和 VPS 端口，程序会提示保留原设置还是重新设置，避免覆盖已有端口转发安排。
 
 WebSocket 路径首次留空会随机生成并显示；修改已有节点时留空会保留原路径。路径需要以 `/` 开头，不能包含空格、`?` 或 `#`。更改路径或端口后，请到“节点管理 > 查看节点”获取新分享链接并更新客户端，并同步更新 Cloudflare 等转发服务的规则。
+
+## AnyTLS 节点
+
+在“1 节点管理 → 2 添加节点”的协议列表选择“4 AnyTLS”，填写 VPS 端口、公网地址和自己的证书域名。证书由 sing-box 通过现有 ACME HTTP-01 流程申请和续期，需要域名指向 VPS，公网 TCP 80 可达，并放行节点的 TCP 端口。
+
+AnyTLS 使用原生 TLS，不是 WebSocket，不能经过 Cloudflare 普通橙云 HTTP 代理；使用 Cloudflare DNS 时请设为仅 DNS（灰云），直接连接 VPS。不需要填写 WebSocket 路径或 REALITY 握手目标。
+
+每个用户在每个 AnyTLS 节点上使用独立随机密码，沿用用户授权、停用、重置密钥和出口绑定功能。通过“节点管理 → 查看节点”获取 `anytls://` 分享链接，导入支持 AnyTLS 的客户端；重置密码后需重新获取链接。TLS 证书校验默认开启，不生成跳过验证参数。服务端填充策略和客户端会话参数使用 sing-box 默认值。
+
+AnyTLS 使用 TCP 监听；客户端如需转发 UDP，须支持协议的 UDP over TCP。用户绑定不支持 UDP 的代理出口时，仍会阻止 UDP，不会回退到 VPS 直连。本次仅增加 AnyTLS 入站节点，不支持在“出口管理”中添加 AnyTLS 代理出口。
+
+协议字段与分享链接格式参考：[sing-box AnyTLS 入站](https://sing-box.sagernet.org/configuration/inbound/anytls/)、[sing-box AnyTLS 客户端出站](https://sing-box.sagernet.org/configuration/outbound/anytls/)、[AnyTLS URI 规范](https://github.com/anytls/anytls-go/blob/main/docs/uri_scheme.md)。
 
 ## REALITY 的握手目标和 SNI
 

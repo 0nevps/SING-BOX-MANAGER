@@ -5,7 +5,7 @@ from sbmanager.security import ValidationError, text, identifier
 from sbmanager.system.network import check_reality_target
 
 PROTOCOL_LABELS = {'reality': 'VLESS + REALITY + Vision', 'hysteria2': 'Hysteria2',
-                   'cloudflare_ws': 'VLESS + WebSocket + TLS'}
+                   'cloudflare_ws': 'VLESS + WebSocket + TLS', 'anytls': 'AnyTLS'}
 
 
 def host(value):

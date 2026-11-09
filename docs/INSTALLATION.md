@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 - VPS 的公网 IP 或域名。
 - REALITY 握手目标域名，以及 SNI（握手时使用、需要与目标证书匹配的域名）。SNI 直接回车会使用握手目标域名。
-- Hysteria2 和 WebSocket 的证书域名。
+- Hysteria2、WebSocket 和 AnyTLS 的证书域名。
 - 各节点要在 VPS 上使用的端口。
 
 添加用户时需要填写用户名。WebSocket 路径直接回车会随机生成，保存后会显示生成的路径。
@@ -46,6 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 - REALITY 默认使用 TCP 443，手机或电脑连接同一个端口。
 - Hysteria2 默认使用 UDP 443，手机或电脑连接同一个端口。
+- AnyTLS 默认使用 TCP 443，手机或电脑直接连接 VPS；与 REALITY 等 TCP 节点同时使用时需选择不同端口。需要自己的证书域名，不能通过 Cloudflare 普通橙云 HTTP 代理。
 - WebSocket 先选择直接连接 VPS，还是经过 Cloudflare 代理，再填写 VPS 端口，默认 TCP 8443。直接连接 VPS 时，客户端使用同一个端口；经过 Cloudflare 时，客户端连接 HTTPS 443，你需要自行在 Cloudflare 设置回源到 VPS 所填端口的规则。
 
 使用 HTTP-01 申请证书时，域名解析必须正确，公网 TCP 80 必须能到达 VPS 源站。DNS 解析成功或本机端口检查通过，都不能证明公网访问正常。程序不会自动设置 Cloudflare，也不支持 DNS-01。

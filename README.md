@@ -4,7 +4,7 @@
 
 ## 先认识几个词
 
-- **节点（手机或电脑连接的入口）**：例如 REALITY、Hysteria2 或 WebSocket 节点。
+- **节点（手机或电脑连接的入口）**：例如 REALITY、Hysteria2、WebSocket 或 AnyTLS 节点。
 - **用户**：一组可单独启用、停用和设置节点权限的连接身份。
 - **出口（VPS 访问网络时使用的线路）**：可以为用户在不同节点上分别设置。
 - **直连（DIRECT，不经过代理出口）**：由 VPS 直接访问网络。
@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 - 主菜单顶部显示当前 BBR 和 sing-box 服务状态，返回主菜单时刷新；读取失败显示“未知”，不影响菜单操作。
 - “4 服务管理 → 8 开启 BBR”：确认后使用当前内核的 BBR，设置全机 TCP 默认拥塞控制为 `bbr`、默认队列为 `fq`，并保存重启配置；不更换内核、不重启服务。
 - 普通端口转发：使用 sing-box 原生 direct 入站，将本机端口直连转发到指定 IP/域名和端口，支持 TCP、UDP 或两者；在“7 端口转发”中添加、查看和删除，无需创建用户或代理节点。
-- 三种节点：VLESS + REALITY + Vision、Hysteria2、VLESS + WebSocket + TLS。
+- 四种节点：VLESS + REALITY + Vision、Hysteria2、VLESS + WebSocket + TLS、AnyTLS。AnyTLS 使用独立用户密码和 TLS 证书，默认 TCP 443，支持分享链接和 sing-box 客户端配置导出。
 - 同一用户可以使用多个节点，每个节点分别设置使用权限和连接密钥。
 - 出口支持 HTTP、SOCKS5、Shadowsocks（SS），输入分享链接自动解析；暂不支持其他出口协议或 SS 插件。
 - 每个用户在每个节点上可保存多个出口，并选择其中一个使用，或选择直连（DIRECT，不经过代理出口）。

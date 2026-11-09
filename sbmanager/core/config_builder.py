@@ -33,7 +33,7 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
                 continue
             secret = user['grants'][key]
             entry = {'name': uid}
-            if protocol == 'hysteria2':
+            if protocol in ('hysteria2', 'anytls'):
                 entry['password'] = secret
             else:
                 entry['uuid'] = secret
@@ -51,7 +51,7 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
                 config['route']['rules'].append({'inbound': [key], 'auth_user': [uid],
                                                 'action': 'route', 'outbound': target})
         tls = {'enabled': True, 'server_name': settings['server_name']}
-        node = {'type': 'hysteria2' if protocol == 'hysteria2' else 'vless',
+        node = {'type': protocol if protocol in ('hysteria2', 'anytls') else 'vless',
                 'tag': key, 'listen': settings.get('listen', '::'), 'listen_port': port,
                 'users': users, 'tls': tls}
         if protocol == 'reality':
