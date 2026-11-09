@@ -31,7 +31,7 @@ MENUS = (
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '升级 sing-box',
                   '更新管理程序', '卸载全部', '开启 BBR')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
-    ('高级与帮助', ('查看原始设置 JSON',)),
+    ('高级与帮助', ('查看原始设置 JSON', '仅使用 IPv4 访问网络')),
     ('端口转发', ('查看转发', '添加转发', '删除转发')),
 )
 DANGEROUS = {'删除节点', '删除用户', '删除出口', '删除转发', '卸载全部'}
@@ -492,6 +492,24 @@ def backup_action(action, manager, deployment):
 def advanced_action(action, manager):
     if action == 1:
         print(json.dumps(manager.summary(), ensure_ascii=False, indent=2))
+    elif action == 2:
+        state = manager.store.read()
+        enabled = state.get('direct_ipv4_only', False)
+        menu_text('当前状态：' + ('已开启' if enabled else '已关闭'))
+        menu_text('开启后，使用 VPS 本机出口的所有节点仅通过 IPv4 访问网站和其他目标；'
+                  '无法访问仅支持 IPv6 的目标。')
+        menu_text('不影响客户端通过 IPv6 连接节点，不影响端口转发；'
+                  '使用代理出口的流量不受此设置控制。')
+        selected = choose('仅使用 IPv4 访问网络', ((True, '开启'), (False, '关闭')))
+        if selected == enabled:
+            message('设置未改变')
+            return
+        status = '开启' if selected else '关闭'
+        if confirm(f'将{status}“仅使用 IPv4 访问网络”。已部署时会检查配置并重启服务，连接可能短暂中断。'):
+            manager.set_direct_ipv4_only(selected)
+            message('仅使用 IPv4 访问网络已' + status)
+            if not state.get('deployed'):
+                message('设置已保存；首次使用请到“服务管理”检查配置并启动服务', tone='warning')
 
 
 def run(manager, engine, deployment):

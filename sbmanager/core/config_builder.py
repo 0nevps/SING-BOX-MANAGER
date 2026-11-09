@@ -6,6 +6,11 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
     config = {'log': {'level': 'warn', 'timestamp': True}, 'inbounds': [],
               'outbounds': [{'type': 'direct', 'tag': 'direct'}],
               'route': {'rules': [], 'final': 'direct'}}
+    ipv4_only = state.get('direct_ipv4_only', False) and bool(state['inbounds'])
+    if ipv4_only:
+        config['dns'] = {'servers': [{'type': 'local', 'tag': 'local-dns'}]}
+        config['outbounds'].append({'type': 'direct', 'tag': 'direct-ipv4',
+            'domain_resolver': {'server': 'local-dns', 'strategy': 'ipv4_only'}})
     for key, profile in state['egress'].items():
         from sbmanager.egress.registry import driver
         config['outbounds'].append(driver(profile['protocol']).build_outbound(profile))
@@ -50,6 +55,12 @@ def build(state, acme_directory='/var/lib/sbmanager/acme'):
                                                     'network': 'udp', 'action': 'reject'})
                 config['route']['rules'].append({'inbound': [key], 'auth_user': [uid],
                                                 'action': 'route', 'outbound': target})
+        if ipv4_only:
+            # Proxy bindings above terminate routing before these direct-only rules.
+            config['route']['rules'].extend([
+                {'inbound': [key], 'ip_version': 6, 'action': 'reject'},
+                {'inbound': [key], 'action': 'route', 'outbound': 'direct-ipv4'},
+            ])
         tls = {'enabled': True, 'server_name': settings['server_name']}
         node = {'type': protocol if protocol in ('hysteria2', 'anytls') else 'vless',
                 'tag': key, 'listen': settings.get('listen', '::'), 'listen_port': port,

@@ -43,6 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 - 同一用户可以使用多个节点，每个节点分别设置使用权限和连接密钥。
 - 出口支持 HTTP、SOCKS5、Shadowsocks（SS），输入分享链接自动解析；暂不支持其他出口协议或 SS 插件。
 - 每个用户在每个节点上可保存多个出口，并选择其中一个使用，或选择直连（DIRECT，不经过代理出口）。
+- “6 高级与帮助 → 2 仅使用 IPv4 访问网络”：全局开关，默认关闭；开启后仅限制所有节点的 VPS 本机出口，不影响 IPv6 入站连接、代理出口和独立端口转发。
 - 不支持 UDP 的代理出口会阻止 UDP 流量，不会偷偷改用 VPS 直连。
 - 由 sing-box 通过 ACME 申请和续期证书，管理器提供检查功能。
 - 查看节点分享链接、systemd 服务状态和日志。

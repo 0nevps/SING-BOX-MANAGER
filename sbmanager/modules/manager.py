@@ -15,6 +15,13 @@ class Manager:
     def __init__(self, store):
         self.store = store
 
+    def set_direct_ipv4_only(self, enabled):
+        if type(enabled) is not bool:
+            raise ValidationError('仅使用 IPv4 访问网络设置格式不正确，必须为 true（开启）或 false（关闭）')
+        def change(state):
+            state['direct_ipv4_only'] = enabled
+        self.store.update(change)
+
     def add_forward(self, values):
         from sbmanager.core.forwarding import validate_forward
         entry = {**validate_forward(values), 'id': identifier()}

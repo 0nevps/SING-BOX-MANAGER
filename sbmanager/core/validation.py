@@ -7,6 +7,8 @@ def validate_state(state):
         raise ValidationError('保存的数据格式版本不兼容，无法继续。请使用匹配的程序版本，不要手动修改数据文件')
     if type(state.get('backup_keep', 20)) is not int or state.get('backup_keep', 20) < 1:
         raise ValidationError('备份保留数量必须是至少为 1 的整数，请检查备份设置')
+    if type(state.get('direct_ipv4_only', False)) is not bool:
+        raise ValidationError('仅使用 IPv4 访问网络设置格式不正确，必须为 true（开启）或 false（关闭）')
     for name in ('users', 'inbounds', 'egress', 'bindings'):
         if not isinstance(state.get(name), dict):
             raise ValidationError(f'保存的数据格式不正确（字段 {name}）。请保留原文件，使用有效备份恢复，不要手动删除数据')

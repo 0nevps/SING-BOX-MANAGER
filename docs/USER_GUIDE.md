@@ -114,7 +114,21 @@
 | 编号 | 菜单名称 | 用途 |
 | --- | --- | --- |
 | 1 | 查看原始设置JSON | 查看原始管理数据，供排查问题使用。 |
+| 2 | 仅使用 IPv4 访问网络 | 查看当前状态，按编号开启或关闭所有节点的本机出口 IPv4 限制。 |
 | 0 | 返回 | 返回主菜单。 |
+
+#### 仅使用 IPv4 访问网络
+
+选择“6 高级与帮助 → 2 仅使用 IPv4 访问网络”，查看“当前状态：已开启 / 已关闭”，选择“开启”或“关闭”，输入 `y` 确认。输入 `0` 或不确认则不修改；选择与当前相同的状态也不修改。
+
+- 默认关闭，已有数据没有此设置时保持原有行为。设置随管理数据保存，后续更新和重启保留；备份恢复时恢复对应备份中的设置，旧备份没有此设置时按关闭处理。
+- 开启后，使用 VPS 本机出口（直连）的所有节点仅通过 IPv4 访问网站和其他目标。域名只解析 IPv4，客户端直接提交的 IPv6 目标地址也会被拒绝；仅支持 IPv6 的目标无法访问，不会回退到 IPv6。
+- 不禁用系统 IPv6，不修改节点监听地址，不影响客户端通过 IPv6 连接节点，也不影响独立端口转发。此设置不是全机 IPv6 出站防火墙，不限制证书申请、系统 DNS 等其他连接。
+- 用户绑定 HTTP、SOCKS5 或 SS 代理出口时，该流量及到代理服务器的连接不受此设置控制；切回直连后受此设置限制。
+- 首次部署前仅保存设置，仍需执行“4 服务管理 → 2 检查配置并启动服务”。已部署后修改会检查配置并重启服务，连接可能短暂中断；应用失败时复用原有的数据、配置和服务回滚流程。
+- 关闭后移除上述 IPv4 限制，不代表强制使用 IPv6，实际连接仍取决于目标地址和 VPS 网络。
+
+实现使用独立的 `direct` 出站及 `domain_resolver.strategy: ipv4_only`，配合节点路由中的 IPv6 目标拒绝规则；代理出口规则优先匹配，端口转发仍使用原直连出站。官方依据：[拨号字段](https://sing-box.sagernet.org/configuration/shared/dial/#domain_resolver)、[迁移说明](https://sing-box.sagernet.org/migration/#migrate-outbound-domain-strategy-option-to-domain-resolver)、[路由规则](https://sing-box.sagernet.org/configuration/route/rule/)、[拒绝动作](https://sing-box.sagernet.org/configuration/route/rule_action/#reject)。配置检查通过不等于客户端连通性已经通过，仍需在双栈 VPS 上通过客户端分别验证 IPv4 和 IPv6 目标。
 
 ### 7 端口转发
 
