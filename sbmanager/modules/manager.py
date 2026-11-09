@@ -30,6 +30,15 @@ class Manager:
             return entry['id']
         return self.store.update(change)
 
+    def update_forward(self, forward_id, values):
+        from sbmanager.core.forwarding import validate_forward
+        entry = {**validate_forward(values), 'id': forward_id}
+        def change(state):
+            records = state.get('forwards', {})
+            require(records, forward_id, '端口转发')
+            records[forward_id] = entry
+        self.store.update(change)
+
     def delete_forward(self, forward_id):
         def change(state):
             records = state.get('forwards', {})

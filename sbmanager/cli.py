@@ -33,7 +33,7 @@ MENUS = (
                   '取消节点权限', '重置连接密钥', '删除用户')),
     ('出口管理', ('查看出口', '添加出口', '修改出口', '测试连接', '切换用户出口',
                   '移除已保存的出口', '删除出口')),
-    ('端口转发', ('查看转发', '添加转发', '删除转发')),
+    ('端口转发', ('查看转发', '添加转发', '编辑转发', '删除转发')),
     ('服务管理', ('查看状态', '检查配置并启动服务', '查看日志', '检查证书', '查看原始设置 JSON')),
     ('备份与恢复', ('创建备份', '查看备份', '从备份恢复', '设置保留数量')),
     ('网络设置', ('节点流量仅用 IPv4', '开启 BBR')),
@@ -416,26 +416,42 @@ def forward_action(action, manager):
             network = 'TCP + UDP' if record['network'] == 'both' else record['network'].upper()
             print(f'{record["name"]} · {network} · [{record["listen"]}]:{record["listen_port"]}'
                   f' 转发到 [{record["target"]}]:{record["target_port"]} · 直连')
-    elif action == 2:
-        print('回车使用默认值，0 取消。监听公网地址会开放转发端口；请自行配置防火墙。')
-        name = node_field('转发名称', '端口转发')
-        listen = node_field('监听 IP', '0.0.0.0')
-        choice = node_field('协议：1 TCP + UDP，2 TCP，3 UDP', '1')
+    elif action in (2, 3):
+        key, previous = None, {}
+        if action == 3:
+            key = choose('编辑转发', ((key, f'{r["name"]} · {r["network"]} · [{r["listen"]}]:{r["listen_port"]}')
+                                        for key, r in records.items()))
+            previous = records[key]
+        print('回车保留当前值，0 取消。监听公网地址会开放转发端口；请自行配置防火墙。' if previous else
+              '回车使用默认值，0 取消。监听公网地址会开放转发端口；请自行配置防火墙。')
+        name = node_field('转发名称', previous.get('name', '端口转发'))
+        listen = node_field('监听 IP', previous.get('listen', '0.0.0.0'))
+        choice = node_field('协议：1 TCP + UDP，2 TCP，3 UDP',
+                            {'both': '1', 'tcp': '2', 'udp': '3'}[previous.get('network', 'both')])
         if choice not in ('1', '2', '3'):
             raise ValueError('请选择 1、2 或 3')
         network = {'1': 'both', '2': 'tcp', '3': 'udp'}[choice]
 
         def check_listener(values):
-            check_forward_conflict(manager.store.read(), values)
-            # Probe only the new listener; existing listeners may belong to our running service.
-            listener = {'type': 'direct', 'listen': values['listen'], 'listen_port': values['listen_port']}
-            if values['network'] != 'both':
-                listener['network'] = values['network']
-            check_available({'inbounds': [listener]})
+            state = manager.store.read()
+            current = state.get('forwards', {}).pop(key, None)
+            check_forward_conflict(state, values)
+            # Running listeners cannot be probed with bind(). Reused transports on
+            # the same port are checked by the deployment's post-restart health check.
+            networks = ('tcp', 'udp') if values['network'] == 'both' else (values['network'],)
+            reused = ()
+            deployment = manager.store.deployment
+            if (current and state.get('deployed') and deployment and deployment.service.active()
+                    and current['listen_port'] == values['listen_port']):
+                reused = ('tcp', 'udp') if current['network'] == 'both' else (current['network'],)
+            listeners = [{'type': 'direct', 'listen': values['listen'], 'listen_port': values['listen_port'],
+                          'network': network} for network in networks if network not in reused]
+            if listeners:
+                check_available({'inbounds': listeners})
 
         target = None
         while True:
-            port = int(node_field('监听端口'))
+            port = int(node_field('监听端口', str(previous.get('listen_port', ''))))
             values = validate_forward_listener({'listen': listen, 'listen_port': port, 'network': network})
             try:
                 check_listener(values)
@@ -443,16 +459,20 @@ def forward_action(action, manager):
                 message(f'{error}。请重新输入监听端口，输入 0 取消', tone='warning')
                 continue
             if target is None:
-                target = node_field('目标 IP 或域名')
-                target_port = int(node_field('目标端口'))
+                target = node_field('目标 IP 或域名', previous.get('target', ''))
+                target_port = int(node_field('目标端口', str(previous.get('target_port', ''))))
             try:
                 check_listener(values)
-                manager.add_forward({'name': name, **values, 'target': target, 'target_port': target_port})
+                entry = {'name': name, **values, 'target': target, 'target_port': target_port}
+                if key is None:
+                    manager.add_forward(entry)
+                else:
+                    manager.update_forward(key, entry)
                 break
             except PortInUse as error:
                 message(f'{error}。请重新输入监听端口，输入 0 取消', tone='warning')
         message('转发已保存；首次使用请到“服务管理”检查配置并启动服务')
-    elif action == 3:
+    elif action == 4:
         key = choose('删除转发', ((key, f'{r["name"]} · {r["network"]} · [{r["listen"]}]:{r["listen_port"]}')
                                     for key, r in records.items()))
         if confirm(f'删除转发「{records[key]["name"]}」，对应端口将停止转发。'):

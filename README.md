@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 - 菜单采用绿色分隔线、居中标题和彩色编号；主菜单顶部显示主机名、内核版本、发行版、BBR 和 sing-box 服务状态，返回主菜单时刷新；读取失败显示“未知”，不影响菜单操作。支持窄终端折行和纯文本输出。
 - “7 网络设置 → 2 开启 BBR”：确认后使用当前内核的 BBR，设置全机 TCP 默认拥塞控制为 `bbr`、默认队列为 `fq`，并保存重启配置；不更换内核、不重启服务。
-- 普通端口转发：使用 sing-box 原生 direct 入站，将本机端口直连转发到指定 IP/域名和端口，支持 TCP、UDP 或两者；在“4 端口转发”中添加、查看和删除，无需创建用户或代理节点。
+- 普通端口转发：使用 sing-box 原生 direct 入站，将本机端口直连转发到指定 IP/域名和端口，支持 TCP、UDP 或两者；在“4 端口转发”中添加、查看、编辑和删除，无需创建用户或代理节点。
 - 四种节点：VLESS + REALITY + Vision、Hysteria2、VLESS + WebSocket + TLS、AnyTLS。AnyTLS 使用独立用户密码和 TLS 证书，默认 TCP 443，支持分享链接和 sing-box 客户端配置导出。
 - 同一用户可以使用多个节点，每个节点分别设置使用权限和连接密钥。
 - 出口支持 HTTP、SOCKS5、Shadowsocks（SS），输入分享链接自动解析；暂不支持其他出口协议或 SS 插件。
