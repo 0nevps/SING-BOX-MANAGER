@@ -1,6 +1,7 @@
 """Interactive menus for local settings and installed service management."""
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -15,9 +16,10 @@ from sbmanager.system import bbr
 
 
 STYLES = {
-    'title': '\033[1;36m',
-    'section': '\033[1m',
-    'accent': '\033[36m',
+    'title': '\033[1;32m',
+    'section': '\033[32m',
+    'accent': '\033[32m',
+    'info': '\033[34m',
     'success': '\033[32m',
     'warning': '\033[33m',
     'error': '\033[31m',
@@ -62,29 +64,48 @@ def menu_width():
     return max(1, min(56, shutil.get_terminal_size(fallback=(80, 24)).columns - 1))
 
 
-def menu_text(text, prefix='  ', tone=None):
-    """Wrap menu labels by display cells, including wide Chinese characters."""
+def display_width(text):
+    return sum(0 if unicodedata.combining(char) else
+               2 if unicodedata.east_asian_width(char) in 'WF' else 1 for char in text)
+
+
+def menu_text(text, prefix='  ', tone=None, prefix_tone=None, continuation=None):
+    """Wrap plain text before coloring so ANSI codes never affect alignment."""
     width = menu_width()
-    line = prefix
-    cells = len(prefix)
+    indent = ' ' * display_width(prefix) if continuation is None else continuation
+    line = ''
+    cells = display_width(prefix)
     for char in text:
-        size = 0 if unicodedata.combining(char) else 2 if unicodedata.east_asian_width(char) in 'WF' else 1
-        if cells + size > width and cells > len(prefix):
-            print(styled(line, tone) if tone else line)
-            line = ' ' * len(prefix)
-            cells = len(prefix)
+        size = display_width(char)
+        if cells + size > width and line:
+            print((styled(prefix, prefix_tone) if prefix_tone else prefix)
+                  + (styled(line, tone) if tone else line))
+            prefix = indent
+            line = ''
+            cells = display_width(prefix)
         line += char
         cells += size
-    print(styled(line, tone) if tone else line)
+    print((styled(prefix, prefix_tone) if prefix_tone else prefix)
+          + (styled(line, tone) if tone else line))
+
+
+def menu_rule():
+    print(styled('=' * menu_width(), 'accent'))
 
 
 def menu_heading(title):
     print()
-    print(styled('=' * min(32, menu_width()), 'accent'))
-    if title == '主菜单':
-        menu_text('SING-BOX MANAGER', tone='title')
-    menu_text(title, tone='section')
-    print(styled('-' * min(32, menu_width()), 'accent'))
+    menu_rule()
+    heading = 'SING-BOX MANAGER · 主菜单' if title == '主菜单' else title
+    padding = max(0, (menu_width() - display_width(heading)) // 2)
+    menu_text(heading, prefix=' ' * padding, tone='title', continuation='  ')
+    menu_rule()
+    print()
+
+
+def menu_field(label, value, tone='info'):
+    menu_text(str(value), prefix=f'  {label}：', tone=tone,
+              prefix_tone='accent', continuation='    ')
 
 
 # Keep grouping on the main menu; submenus remain short numbered lists.
@@ -95,10 +116,18 @@ MENU_GROUPS = {
 
 def main_status(deployment):
     """Refresh live status without loading or mutating business state."""
+    for label, read in (('主机名', platform.node), ('系统', platform.release),
+                        ('发行版', lambda: platform.freedesktop_os_release().get('PRETTY_NAME', '未知'))):
+        try:
+            value = read()
+        except (OSError, ValueError):
+            value = '未知（读取失败）'
+        menu_field(label, value or '未知')
+    print()
     try:
         active = deployment.service.active()
         service = '运行中' if active else '未运行'
-        service_tone = 'success' if active else 'warning'
+        service_tone = 'success' if active else 'error'
     except (OSError, ValueError, subprocess.SubprocessError):
         service, service_tone = '未知（读取失败）', 'warning'
     try:
@@ -107,8 +136,11 @@ def main_status(deployment):
         bbr_tone = 'success' if active else 'warning'
     except (OSError, ValueError):
         congestion, bbr_tone = '未知（读取失败）', 'warning'
-    menu_text(f'BBR：{congestion}', tone=bbr_tone)
-    menu_text(f'sing-box 服务：{service}', tone=service_tone)
+    menu_field('BBR', congestion, tone=bbr_tone)
+    menu_field('sing-box 服务', service, tone=service_tone)
+    print()
+    menu_rule()
+    print()
 
 
 def choose(title, options, back='取消', status=None):
@@ -121,17 +153,20 @@ def choose(title, options, back='取消', status=None):
         menu_heading(title)
         if status is not None:
             status()
+        menu_text('请选择操作：', tone='accent')
         groups = MENU_GROUPS.get(title, {}) if back != '取消' else {}
         for number, (_, label) in enumerate(options, 1):
             if number in groups:
+                print()
                 menu_text(f'[{groups[number]}]', tone='section')
             tone = 'error' if label in DANGEROUS else 'warning' if label in CAUTION else 'accent'
             suffix = ' [危险]' if label in DANGEROUS else ' [注意]' if label in CAUTION else ''
-            menu_text(label + suffix, prefix=f' {number:>2} ', tone=tone)
-        print(styled('-' * min(32, menu_width()), 'accent'))
-        menu_text(back, prefix='  0 ', tone='section')
-        print(styled('=' * min(32, menu_width()), 'accent'))
-        answer = ask(f'请选择 [0-{len(options)}]')
+            menu_text(label + suffix, prefix=f'  {number:>2}) ', tone=tone,
+                      prefix_tone='info' if tone == 'accent' else tone)
+        print()
+        menu_text(back, prefix='   0) ', tone='accent', prefix_tone='warning')
+        print()
+        answer = input(styled(f'  请输入选项 [0-{len(options)}]: ', 'accent')).strip()
         if answer == '0':
             raise Cancelled
         if answer.isascii() and answer.isdecimal() and 1 <= int(answer) <= len(options):

@@ -6,7 +6,7 @@ import re
 import unittest
 from unittest.mock import Mock, patch
 
-from sbmanager.cli import Cancelled, MENUS, ask, choose, run
+from sbmanager.cli import Cancelled, MENUS, ask, choose, main_status, run
 
 
 class TerminalOutput(io.StringIO):
@@ -26,7 +26,7 @@ class CliPresentationTests(unittest.TestCase):
 
     def test_main_menu_has_eight_categories_and_exit(self):
         output, _ = self.run_menu(['0'])
-        options = re.findall(r'^ +(\d+) (.+)$', output, re.MULTILINE)
+        options = re.findall(r'^ +(\d+)\) (.+)$', output, re.MULTILINE)
         self.assertEqual([str(number) for number in (1, 2, 3, 4, 5, 6, 7, 8, 0)],
                          [number for number, _ in options])
         self.assertEqual(['节点管理', '用户管理', '出口管理', '端口转发', '服务管理',
@@ -34,8 +34,10 @@ class CliPresentationTests(unittest.TestCase):
                          [label for _, label in options])
         for text in ('复制', 'ID', 'SOCKS5', '删除用户', 'users 是用户'):
             self.assertNotIn(text, output)
-        self.assertLessEqual(len(output.splitlines()), 22)
-        self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output)
+        self.assertLessEqual(len(output.splitlines()), 36)
+        self.assertRegex(output, r'(?m)^ +SING-BOX MANAGER · 主菜单$')
+        self.assertLess(output.index('主机名：'), output.index('请选择操作：'))
+        self.assertLess(output.index('sing-box 服务：'), output.index('[业务配置]'))
         self.assertEqual(['业务配置', '运行与维护', '系统设置'],
                          re.findall(r'^  \[(.+)\]$', output, re.MULTILINE))
 
@@ -44,13 +46,15 @@ class CliPresentationTests(unittest.TestCase):
             output, _ = self.run_menu(['2', '0', '0'])
         rules = re.findall(r'^[=-]+$', output, re.MULTILINE)
         self.assertTrue(rules)
-        self.assertTrue(all(len(rule) == 32 for rule in rules))
+        self.assertTrue(all(len(rule) == 56 for rule in rules))
+        title = next(line for line in output.splitlines() if 'SING-BOX MANAGER' in line)
+        self.assertEqual(15, len(title) - len(title.lstrip()))
 
     def test_submenu_returns_to_main(self):
         output, _ = self.run_menu(['2', '0', '0'])
         self.assertEqual(2, output.count('主菜单'))
-        self.assertIn('\n  用户管理\n', output)
-        self.assertIn('\n  0 返回\n', output)
+        self.assertRegex(output, r'(?m)^ +用户管理$')
+        self.assertIn('\n   0) 返回\n', output)
         self.assertIn('删除用户', output)
         self.assertNotIn('删除出口', output)
 
@@ -92,10 +96,12 @@ class CliPresentationTests(unittest.TestCase):
 
     def test_terminal_uses_semantic_colors(self):
         output, prompts = self.run_menu(['2', '0', '0'], TerminalOutput())
-        self.assertIn('\x1b[1;36m  SING-BOX MANAGER\x1b[0m', output)
-        self.assertIn('\x1b[36m  1 节点管理\x1b[0m', output)
-        self.assertIn('\x1b[31m  8 删除用户 [危险]\x1b[0m', output)
-        self.assertIn('\x1b[36m', prompts)
+        self.assertIn('\x1b[1;32mSING-BOX MANAGER · 主菜单\x1b[0m', output)
+        self.assertIn('\x1b[32m' + '=' * 56 + '\x1b[0m', output)
+        self.assertIn('\x1b[34m   1) \x1b[0m\x1b[32m节点管理\x1b[0m', output)
+        self.assertIn('\x1b[31m删除用户 [危险]\x1b[0m', output)
+        self.assertIn('\x1b[33m   0) \x1b[0m', output)
+        self.assertIn('\x1b[32m  请输入选项 [0-8]: \x1b[0m', prompts)
 
     def test_no_color_and_dumb_terminal_disable_colors(self):
         for environment in ({'NO_COLOR': '', 'TERM': 'xterm'}, {'TERM': 'dumb'}):
@@ -114,7 +120,7 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('卸载全部 [危险]', output)
         self.assertIn('更新管理程序 [注意]', output)
         self.assertIn('开启 BBR [注意]', output)
-        self.assertIn('请选择 [0-8]', prompts)
+        self.assertIn('请输入选项 [0-8]: ', prompts)
 
     def test_narrow_menu_wraps_chinese_without_losing_labels(self):
         import unicodedata
@@ -140,6 +146,59 @@ class CliPresentationTests(unittest.TestCase):
         self.assertEqual(2, deployment.service.active.call_count)
         self.assertEqual(2, enabled.call_count)
         deployment.service.restart.assert_not_called()
+
+    def test_host_information_is_read_only_and_has_semantic_colors(self):
+        deployment = Mock()
+        deployment.service.active.return_value = False
+        output = TerminalOutput()
+        with patch.dict(os.environ, {'TERM': 'xterm'}, clear=True), \
+                patch('sbmanager.cli.platform.node', return_value='vps-example'), \
+                patch('sbmanager.cli.platform.release', return_value='6.1.0-amd64'), \
+                patch('sbmanager.cli.platform.freedesktop_os_release',
+                      return_value={'PRETTY_NAME': 'Debian GNU/Linux 12'}), \
+                patch('sbmanager.cli.bbr.enabled', return_value=True), \
+                contextlib.redirect_stdout(output):
+            main_status(deployment)
+        text = output.getvalue()
+        self.assertIn('\x1b[32m  主机名：\x1b[0m\x1b[34mvps-example\x1b[0m', text)
+        self.assertIn('\x1b[34m6.1.0-amd64\x1b[0m', text)
+        self.assertIn('\x1b[34mDebian GNU/Linux 12\x1b[0m', text)
+        self.assertIn('\x1b[31m未运行\x1b[0m', text)
+        self.assertIn('\x1b[32m已开启\x1b[0m', text)
+        deployment.service.restart.assert_not_called()
+
+    def test_host_information_failure_does_not_block_menu(self):
+        with patch('sbmanager.cli.platform.node', side_effect=OSError('unavailable')), \
+                patch('sbmanager.cli.platform.release', return_value=''), \
+                patch('sbmanager.cli.platform.freedesktop_os_release', side_effect=OSError('missing')):
+            output, _ = self.run_menu(['0'])
+        self.assertIn('主机名：未知（读取失败）', output)
+        self.assertIn('系统：未知', output)
+        self.assertIn('发行版：未知（读取失败）', output)
+        self.assertIn('0) 退出', output)
+        self.assertNotIn('操作未完成', output)
+
+    def test_narrow_main_menu_wraps_host_information_and_title(self):
+        import unicodedata
+
+        with patch('sbmanager.cli.shutil.get_terminal_size', return_value=os.terminal_size((24, 24))), \
+                patch('sbmanager.cli.platform.node', return_value='vps-' + 'long-name-' * 8), \
+                patch('sbmanager.cli.platform.freedesktop_os_release',
+                      return_value={'PRETTY_NAME': 'Debian GNU/Linux 12 (bookworm)'}):
+            output, _ = self.run_menu(['0'])
+        for line in output.splitlines():
+            width = sum(0 if unicodedata.combining(char) else
+                        2 if unicodedata.east_asian_width(char) in 'WF' else 1 for char in line)
+            self.assertLessEqual(width, 23)
+        compact = ''.join(output.split())
+        self.assertIn('SING-BOXMANAGER·主菜单', compact)
+        self.assertIn('vps-' + 'long-name-' * 8, compact)
+
+    def test_menu_prompt_is_inline_and_accepts_whitespace(self):
+        with patch('builtins.input', return_value='  1  ') as reader, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual('value', choose('选择节点', [('value', '示例节点')]))
+        reader.assert_called_once_with('  请输入选项 [0-1]: ')
 
     def test_input_starts_on_its_own_line_and_strips_whitespace(self):
         with patch('builtins.input', return_value='  value  ') as reader, \

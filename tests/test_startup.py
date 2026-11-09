@@ -26,7 +26,8 @@ class StartupTests(unittest.TestCase):
                  contextlib.redirect_stdout(output):
                 self.assertEqual(0, main())
             self.assertEqual(2, output.getvalue().count('主菜单'))
-            self.assertEqual(2, output.getvalue().count('\n  节点管理\n'))
+            self.assertEqual(2, sum(line.strip() == '节点管理'
+                                    for line in output.getvalue().splitlines()))
             self.assertNotIn('首次设置向导', output.getvalue())
             self.assertEqual(4, reader.call_count)
             engine.return_value.version.assert_not_called()
@@ -56,7 +57,7 @@ class StartupTests(unittest.TestCase):
                 deployment.assert_called_once_with(
                     store, '/etc/sbmanager/config.json', engine, systemd.return_value)
                 self.assertIs(store.deployment, deployment.return_value)
-                self.assertIn('  SING-BOX MANAGER\n  主菜单\n', output.getvalue())
+                self.assertIn('SING-BOX MANAGER · 主菜单', output.getvalue())
                 self.assertNotIn('首次设置：', output.getvalue())
                 self.assertEqual(1, reader.call_count)
                 engine.version.assert_not_called()

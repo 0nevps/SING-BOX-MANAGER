@@ -41,7 +41,7 @@ class CliWordingTests(unittest.TestCase):
         self.assertNotIn('术语帮助', output)
         self.assertNotIn('独立的连接身份', output)
         self.assertIn('编号无效', output)
-        self.assertIn('请选择 [0-2]', prompts)
+        self.assertIn('请输入选项 [0-2]', prompts)
         self.assertEqual(before, self.store.path.read_bytes())
 
     def test_service_status_uses_connected_service(self):
@@ -72,7 +72,7 @@ class CliWordingTests(unittest.TestCase):
         egress = self.add_proxy()
         self.manager.bind(self.user, self.node, egress)
         output, prompts = self.run_menu(['3', '5', '1', '1', '', '1', '0', '0'])
-        self.assertIn('1 直连（DIRECT）', output)
+        self.assertIn('1) 直连（DIRECT）', output)
         self.assertIn('编号无效', output)
         self.assertNotIn('ID', prompts)
         binding = self.store.read()['bindings'][f'{self.user}:{self.node}']
@@ -194,7 +194,7 @@ class CliWordingTests(unittest.TestCase):
         self.assertNotIn('[客户端]', output)
         self.assertNotIn('保存到新目录', prompts)
         self.assertIn('编号无效', output)
-        self.assertIn('请选择 [0-8]', prompts)
+        self.assertIn('请输入选项 [0-8]', prompts)
         self.assertEqual(before, self.store.path.read_bytes())
 
     def test_remove_saved_egress_still_protects_active_binding(self):
