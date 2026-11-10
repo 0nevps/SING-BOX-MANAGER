@@ -15,7 +15,7 @@
 安装和更新直接获取当前仓库 `main` 分支的完整源码，包括 Python 程序，无需手动下载其他文件。在 Debian/Ubuntu 上安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | sudo bash -s -- 0nevps/SING-BOX-MANAGER
+curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/install.sh | bash -s -- 0nevps/SING-BOX-MANAGER
 ```
 
 更新时选择“8 更新与卸载 → 1 更新管理程序”，或重新运行相同安装命令，即可获取 `main` 最新代码，保留数据和配置。不需要指定版本，也不依赖本项目的 tag 或 Release。彻底删除本工具时，选择“8 更新与卸载 → 3 卸载全部”，核对删除范围后输入 `y`。
