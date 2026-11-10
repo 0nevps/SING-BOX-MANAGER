@@ -4,7 +4,7 @@ import io
 import os
 import re
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 from sbmanager.cli import Cancelled, MENUS, ask, choose, main_status, run
 
@@ -163,7 +163,7 @@ class CliPresentationTests(unittest.TestCase):
         with patch.dict(os.environ, {'TERM': 'xterm'}, clear=True), \
                 patch('sbmanager.cli.platform.node', return_value='vps-example'), \
                 patch('sbmanager.cli.platform.release', return_value='6.1.0-amd64'), \
-                patch('sbmanager.cli.platform.freedesktop_os_release',
+                patch('sbmanager.cli.platform.freedesktop_os_release', create=True,
                       return_value={'PRETTY_NAME': 'Debian GNU/Linux 12'}), \
                 patch('sbmanager.cli.bbr.enabled', return_value=True), \
                 contextlib.redirect_stdout(output):
@@ -179,7 +179,8 @@ class CliPresentationTests(unittest.TestCase):
     def test_host_information_failure_does_not_block_menu(self):
         with patch('sbmanager.cli.platform.node', side_effect=OSError('unavailable')), \
                 patch('sbmanager.cli.platform.release', return_value=''), \
-                patch('sbmanager.cli.platform.freedesktop_os_release', side_effect=OSError('missing')):
+                patch('sbmanager.cli.platform.freedesktop_os_release', create=True,
+                      side_effect=OSError('missing')):
             output, _ = self.run_menu(['0'])
         self.assertIn('主机名：未知（读取失败）', output)
         self.assertIn('系统：未知', output)
@@ -187,12 +188,54 @@ class CliPresentationTests(unittest.TestCase):
         self.assertIn('0) 退出', output)
         self.assertNotIn('操作未完成', output)
 
+    def test_python39_reads_distribution_without_platform_api(self):
+        for value in ('"Debian GNU/Linux 11 (bullseye)"',
+                      "'Debian GNU/Linux 11 (bullseye)'", 'Debian'):
+            with self.subTest(value=value), \
+                    patch('sbmanager.cli.platform', spec=['node', 'release']), \
+                    patch('builtins.open', mock_open(read_data=(
+                        '# distribution metadata\nNAME=Debian\nPRETTY_NAME=' + value + '\n'))) as source:
+                output, _ = self.run_menu(['0'])
+                self.assertIn('发行版：' + value.strip('\'"'), output)
+                self.assertIn('0) 退出', output)
+                source.assert_called_once_with('/etc/os-release', encoding='utf-8')
+
+    def test_python39_falls_back_to_vendor_os_release(self):
+        source = mock_open(read_data='PRETTY_NAME="Debian GNU/Linux 11"\n')
+        source.side_effect = [FileNotFoundError('missing'), source.return_value]
+        with patch('sbmanager.cli.platform', spec=['node', 'release']), \
+                patch('builtins.open', source):
+            output, _ = self.run_menu(['0'])
+        self.assertIn('发行版：Debian GNU/Linux 11', output)
+        self.assertEqual(['/etc/os-release', '/usr/lib/os-release'],
+                         [call.args[0] for call in source.call_args_list])
+
+    def test_python39_distribution_read_failure_does_not_block_menu(self):
+        for error in (FileNotFoundError('missing'), PermissionError('denied')):
+            with self.subTest(error=error), \
+                    patch('sbmanager.cli.platform', spec=['node', 'release']), \
+                    patch('builtins.open', side_effect=error):
+                output, _ = self.run_menu(['0'])
+                self.assertIn('发行版：未知（读取失败）', output)
+                self.assertIn('0) 退出', output)
+
+    def test_python39_missing_or_invalid_distribution_name_does_not_block_menu(self):
+        for content, expected in (('NAME=Debian\n', '未知'),
+                                  ('PRETTY_NAME=""\n', '未知'),
+                                  ('PRETTY_NAME="unterminated\n', '未知（读取失败）')):
+            with self.subTest(content=content), \
+                    patch('sbmanager.cli.platform', spec=['node', 'release']), \
+                    patch('builtins.open', mock_open(read_data=content)):
+                output, _ = self.run_menu(['0'])
+                self.assertIn('发行版：' + expected, output)
+                self.assertIn('0) 退出', output)
+
     def test_narrow_main_menu_wraps_host_information_and_title(self):
         import unicodedata
 
         with patch('sbmanager.cli.shutil.get_terminal_size', return_value=os.terminal_size((24, 24))), \
                 patch('sbmanager.cli.platform.node', return_value='vps-' + 'long-name-' * 8), \
-                patch('sbmanager.cli.platform.freedesktop_os_release',
+                patch('sbmanager.cli.platform.freedesktop_os_release', create=True,
                       return_value={'PRETTY_NAME': 'Debian GNU/Linux 12 (bookworm)'}):
             output, _ = self.run_menu(['0'])
         for line in output.splitlines():

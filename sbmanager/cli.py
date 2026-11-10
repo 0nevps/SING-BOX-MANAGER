@@ -2,6 +2,7 @@
 import json
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -117,10 +118,28 @@ MENU_GROUPS = {
 }
 
 
+def distribution_name():
+    """Read the distribution label without requiring Python 3.10's platform API."""
+    read_release = getattr(platform, 'freedesktop_os_release', None)
+    if read_release is not None:
+        return read_release().get('PRETTY_NAME', '未知')
+    for path in ('/etc/os-release', '/usr/lib/os-release'):
+        try:
+            with open(path, encoding='utf-8') as stream:
+                for line in stream:
+                    key, separator, value = line.partition('=')
+                    if separator and key.strip() == 'PRETTY_NAME':
+                        return ' '.join(shlex.split(value, comments=True)) or '未知'
+            return '未知'
+        except FileNotFoundError:
+            if path == '/usr/lib/os-release':
+                raise
+
+
 def main_status(deployment):
     """Refresh live status without loading or mutating business state."""
     for label, read in (('主机名', platform.node), ('系统', platform.release),
-                        ('发行版', lambda: platform.freedesktop_os_release().get('PRETTY_NAME', '未知'))):
+                        ('发行版', distribution_name)):
         try:
             value = read()
         except (OSError, ValueError):

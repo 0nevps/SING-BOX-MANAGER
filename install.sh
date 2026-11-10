@@ -7,7 +7,7 @@ repo=${1:-}
 [[ $(uname -s) == Linux && $EUID -eq 0 ]] || { echo '请在 Linux VPS 上使用 root 权限运行安装命令；普通用户请使用 sudo' >&2; exit 1; }
 # shellcheck disable=SC1091
 source /etc/os-release
-case "$ID:$VERSION_ID" in debian:12|debian:13|ubuntu:22.04|ubuntu:24.04) ;; *) echo '暂不支持这个系统版本。请使用 Debian 12/13 或 Ubuntu 22.04/24.04' >&2; exit 1;; esac
+case "$ID:$VERSION_ID" in debian:11|debian:12|debian:13|ubuntu:22.04|ubuntu:24.04) ;; *) echo '暂不支持这个系统版本。请使用 Debian 11/12/13 或 Ubuntu 22.04/24.04' >&2; exit 1;; esac
 command -v systemctl >/dev/null || { echo '找不到 systemctl 命令，无法管理服务。请使用带有 systemd 的完整 Linux 系统' >&2; exit 1; }
 case $(uname -m) in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; *) echo '不支持这台机器的 CPU 类型，目前仅支持 x86_64 和 ARM64' >&2; exit 1;; esac
 apt-get update

@@ -2,7 +2,9 @@
 
 ## 安装
 
-使用 Debian 12/13 或 Ubuntu 22.04/24.04，并确保系统使用 systemd。安装需要 root 权限，会修改系统软件包、systemd 和 `/opt/sbmanager` 等目录。
+使用 Debian 11/12/13 或 Ubuntu 22.04/24.04，并确保系统使用 systemd。安装需要 root 权限，会修改系统软件包、systemd 和 `/opt/sbmanager` 等目录。
+
+Debian 11 使用系统自带的 Python 3.9，无需替换系统 Python 或添加第三方软件源。代码兼容性已通过 Python 3.9 自动化测试；Debian 11 上的实际安装、重复安装、服务启停、升级回滚和客户端连接尚未完成实测。
 
 执行前，请先检查仓库中的安装脚本和 `main` 源码。确认后运行：
 
@@ -83,7 +85,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 `sbmanager` 和从源码运行的 `python3 main.py` 都要求 Linux + root，统一使用 `/var/lib/sbmanager/` 和 `/etc/sbmanager/config.json`，会操作真实系统服务。从源码启动不能代替安装器准备依赖和 systemd 服务。可通过 `--sing-box /path/to/sing-box` 指定可执行的 1.14.x 程序文件；这不会隔离管理数据或系统服务。
 
-开发测试需要 Python 3.10+，可在 macOS/Linux 上运行，不需要 root 或第三方 Python 包。测试中的系统操作使用模拟，不应通过启动管理程序进行隔离测试：
+开发测试需要 Python 3.9+，可在 macOS/Linux 上运行，不需要 root 或第三方 Python 包。测试中的系统操作使用模拟，不应通过启动管理程序进行隔离测试：
 
 ```bash
 python3 -m unittest discover -s tests -v

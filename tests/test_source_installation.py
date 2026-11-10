@@ -53,6 +53,30 @@ class SourceInstallationTests(unittest.TestCase):
             calls = (fixtures / 'calls').read_text().splitlines() if (fixtures / 'calls').exists() else []
             return result, calls, (work / 'package' / 'main.py').exists()
 
+    def test_installer_accepts_supported_system_versions_including_debian11(self):
+        guard = SOURCE.split('case "$ID:$VERSION_ID" in ', 1)[1].split('\n', 1)[0]
+        script = 'case "$ID:$VERSION_ID" in ' + guard
+        for system, version in (('debian', '11'), ('debian', '12'), ('debian', '13'),
+                                ('ubuntu', '22.04'), ('ubuntu', '24.04')):
+            with self.subTest(system=system, version=version):
+                result = subprocess.run(
+                    ['bash', '-eu', '-c', script],
+                    env=dict(os.environ, ID=system, VERSION_ID=version),
+                    capture_output=True, text=True, timeout=10)
+                self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_installer_still_rejects_unsupported_system_versions(self):
+        guard = SOURCE.split('case "$ID:$VERSION_ID" in ', 1)[1].split('\n', 1)[0]
+        script = 'case "$ID:$VERSION_ID" in ' + guard
+        for system, version in (('debian', '10'), ('ubuntu', '20.04'), ('alpine', '3.20')):
+            with self.subTest(system=system, version=version):
+                result = subprocess.run(
+                    ['bash', '-eu', '-c', script],
+                    env=dict(os.environ, ID=system, VERSION_ID=version),
+                    capture_output=True, text=True, timeout=10)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn('Debian 11/12/13', result.stderr)
+
     def test_main_downloads_complete_source_from_pinned_commit(self):
         result, calls, extracted = self.run_download()
         self.assertEqual(0, result.returncode, result.stderr)

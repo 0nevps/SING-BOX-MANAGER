@@ -53,7 +53,7 @@ curl -fsSL https://raw.githubusercontent.com/0nevps/SING-BOX-MANAGER/main/instal
 
 ## 系统与网络要求
 
-- 安装脚本支持 Debian 12/13 和 Ubuntu 22.04/24.04，系统需要使用 systemd；其他版本暂不支持。
+- 安装脚本支持 Debian 11/12/13 和 Ubuntu 22.04/24.04，系统需要使用 systemd；其他版本暂不支持。Debian 11 使用系统自带的 Python 3.9，代码兼容性已通过自动化测试；该系统上的实际安装、服务运行、回滚和客户端连接尚未完成实测。
 - 安装和运行管理程序都要求 Linux + root。`sbmanager` 和 `python3 main.py` 均管理真实系统服务，统一使用 `/var/lib/sbmanager/` 保存数据、`/etc/sbmanager/config.json` 保存服务配置。VPS 需要能下载系统依赖、访问 GitHub API 和源码下载服务，以及下载 sing-box 官方发布文件。
 - 安装器会检查和准备 Python 3，程序主要使用 Python 标准库。
 - sing-box 兼容范围为 1.14.x，且必须支持 ACME Certificate Provider（证书申请功能）。
