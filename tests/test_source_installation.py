@@ -161,6 +161,11 @@ class SourceInstallationTests(unittest.TestCase):
             self.assertEqual('a' * 40, (directories[0] / 'main.py').read_text())
             self.assertEqual('{"users": {"alice": {}}}', state.read_text())
 
+    def test_workflow_pins_runner_compatible_with_python39(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/checks.yml').read_text()
+        self.assertIn('runs-on: ubuntu-24.04', workflow)
+        self.assertIn("python: ['3.9',", workflow)
+
     def test_workflow_only_tests_main_without_tags_or_publishing(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/checks.yml').read_text()
         self.assertIn('branches: [main]', workflow)
