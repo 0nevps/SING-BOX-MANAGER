@@ -1,6 +1,7 @@
 """Validation and configuration for fixed-destination TCP/UDP forwarding."""
 import ipaddress
 from sbmanager.egress.drivers.common import endpoint
+from sbmanager.core.port_hopping import hop_range
 from sbmanager.security import PortInUse, ValidationError, text
 
 
@@ -35,6 +36,10 @@ def check_forward_conflict(state, values):
     for node in state['inbounds'].values():
         settings = node.get('settings', {})
         if settings:
+            if 'hop_range' in settings and values['network'] != 'tcp':
+                start, end = hop_range(settings)
+                if start <= values['listen_port'] <= end:
+                    raise PortInUse('端口转发与 Hysteria2 UDP 跳跃范围冲突')
             occupied.add(('udp' if node['protocol'] == 'hysteria2' else 'tcp', settings['port']))
             if node['protocol'] != 'reality':
                 occupied.add(('tcp', 80))

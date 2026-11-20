@@ -46,7 +46,7 @@ class NodeCrudTests(unittest.TestCase):
 
     def test_direct_nodes_do_not_show_cloudflare_rule(self):
         for answers in (['3', '', '2', '', 'direct.example', '', ''],
-                        ['2', '', '', 'hy.example', '']):
+                        ['2', '', '', 'hy.example', '', '']):
             with self.subTest(answers=answers):
                 output = self.action(2, answers)
                 self.assertNotIn('http.host eq', output)
@@ -61,13 +61,13 @@ class NodeCrudTests(unittest.TestCase):
         self.assertEqual('direct', node['settings']['connection_mode'])
 
     def test_complete_add_defaults_and_edit_preserves_name_and_values(self):
-        self.action(2, ['2', '', '', 'node.example', ''])
+        self.action(2, ['2', '', '', 'node.example', '', ''])
         iid, node = next(iter(self.store.read()['inbounds'].items()))
         self.assertEqual('Hysteria2', node['name'])
         self.assertEqual(443, node['settings']['port'])
-        self.action(3, ['1', '', '', ''])
+        self.action(3, ['1', '', '', '', ''])
         self.assertEqual(node, self.store.read()['inbounds'][iid])
-        self.action(2, ['2', '', '8443', 'other.example', ''])
+        self.action(2, ['2', '', '8443', 'other.example', '', ''])
         self.assertEqual(['Hysteria2', 'Hysteria2 2'],
                          [n['name'] for n in self.store.read()['inbounds'].values()])
 
@@ -77,8 +77,26 @@ class NodeCrudTests(unittest.TestCase):
                 self.action(2, answers)
             self.assertEqual({}, self.store.read()['inbounds'])
         with self.assertRaises(ValueError):
-            self.action(2, ['2', '', '', 'invalid host', ''])
+            self.action(2, ['2', '', '', 'invalid host', '', ''])
         self.assertEqual({}, self.store.read()['inbounds'])
+
+    def test_hopping_round_trip_and_disable(self):
+        from sbmanager.modules.export_manager import export_user
+        self.action(2, ['2', '', '', '2001:db8::1', 'node.example', '20000-30000'])
+        iid = next(iter(self.store.read()['inbounds']))
+        uid = self.manager.add_user('alice')
+        self.manager.grant(uid, iid)
+        self.action(3, ['1', '', '', '', ''])
+        result = export_user(self.store.read(), uid)
+        outbound = result['config']['outbounds'][1]
+        self.assertEqual(['20000:30000'], outbound['server_ports'])
+        self.assertNotIn('server_port', outbound)
+        self.assertIn('@[2001:db8::1]:20000-30000/?', result['links'][0])
+        self.action(3, ['1', '', '', '', '-'])
+        result = export_user(self.store.read(), uid)
+        self.assertEqual(443, result['config']['outbounds'][1]['server_port'])
+        self.assertNotIn('server_ports', result['config']['outbounds'][1])
+        self.assertIn('@[2001:db8::1]:443?', result['links'][0])
 
     def test_reality_add_asks_once_for_target_and_sni(self):
         with patch('sbmanager.modules.node_manager.check_reality_target') as probe, \
@@ -134,7 +152,7 @@ class NodeCrudTests(unittest.TestCase):
         self.assertEqual({}, self.store.read()['inbounds'])
 
     def test_delete_confirmation_cleans_only_selected_node(self):
-        self.action(2, ['2', '', '', 'node.example', ''])
+        self.action(2, ['2', '', '', 'node.example', '', ''])
         iid = next(iter(self.store.read()['inbounds']))
         other = self.manager.add_inbound('other', 'reality')
         uid = self.manager.add_user('user')
@@ -152,7 +170,7 @@ class NodeCrudTests(unittest.TestCase):
         self.assertEqual({f'{uid}:{other}'}, set(state['bindings']))
 
     def test_protocol_change_is_rejected_without_mutation(self):
-        self.action(2, ['2', '', '', 'node.example', ''])
+        self.action(2, ['2', '', '', 'node.example', '', ''])
         iid = next(iter(self.store.read()['inbounds']))
         uid = self.manager.add_user('user')
         self.manager.grant(uid, iid)
@@ -161,7 +179,7 @@ class NodeCrudTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '协议不可修改'):
             configure(self.manager, self.engine, iid, {}, protocol='cloudflare_ws')
         self.assertEqual(before, self.store.read())
-        self.action(3, ['1', '8443', '', ''])
+        self.action(3, ['1', '8443', '', '', ''])
         state = self.store.read()
         self.assertEqual('Hysteria2', state['inbounds'][iid]['name'])
         self.assertEqual('hysteria2', state['inbounds'][iid]['protocol'])
@@ -194,7 +212,7 @@ class NodeCrudTests(unittest.TestCase):
             self.assertIn('节点未配置完整', output.getvalue())
 
     def test_view_without_granted_users_has_no_link(self):
-        self.action(2, ['2', '', '', 'node.example', ''])
+        self.action(2, ['2', '', '', 'node.example', '', ''])
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             node_action(1, self.manager, self.engine)
@@ -203,7 +221,7 @@ class NodeCrudTests(unittest.TestCase):
 
     def test_add_is_one_complete_transaction(self):
         with patch.object(self.store, 'update', wraps=self.store.update) as update:
-            self.action(2, ['2', '', '', 'node.example', ''])
+            self.action(2, ['2', '', '', 'node.example', '', ''])
         self.assertEqual(1, update.call_count)
 
     def test_failed_deployment_does_not_save_new_node(self):
@@ -212,7 +230,7 @@ class NodeCrudTests(unittest.TestCase):
         self.store.deployment = Mock()
         self.store.deployment.apply.side_effect = ValueError('invalid configuration')
         with self.assertRaises(ValueError):
-            self.action(2, ['2', '', '', 'node.example', ''])
+            self.action(2, ['2', '', '', 'node.example', '', ''])
         self.assertEqual(before, self.store.path.read_bytes())
         candidate = self.store.deployment.apply.call_args.args[0]
         self.assertEqual('node.example', next(iter(candidate['inbounds'].values()))['settings']['public_host'])

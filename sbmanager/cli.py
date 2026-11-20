@@ -243,6 +243,8 @@ def show_records(manager, kind):
             print(f'  地址：{settings["public_host"]}:{settings.get("public_port", settings["port"])}' if settings else '  地址：未配置')
             if settings:
                 print(f'  监听端口：{settings["port"]} · SNI：{settings.get("server_name", "—")}')
+                if 'hop_range' in settings:
+                    print(f'  UDP 跳跃范围：{settings["hop_range"]}')
                 for field, label in (('handshake', '握手目标'), ('path', 'WebSocket 路径'),
                                      ('connection_mode', '连接方式')):
                     if field in settings:
@@ -332,6 +334,12 @@ def edit_node(manager, engine, adding=False):
         values['handshake'] = values['server_name'] = target
     else:
         values['server_name'] = node_field('证书域名', previous.get('server_name', values['public_host']))
+        if protocol == 'hysteria2':
+            ports = node_field('UDP 跳跃范围（例如 20000-30000；输入 - 关闭）', previous.get('hop_range', '-'))
+            if ports == '-':
+                values.pop('hop_range', None)
+            else:
+                values['hop_range'] = ports
         if protocol == 'cloudflare_ws':
             values['path'] = node_field('WebSocket 路径' if previous.get('path') else 'WebSocket 路径（留空自动生成）',
                                         previous.get('path', ''))

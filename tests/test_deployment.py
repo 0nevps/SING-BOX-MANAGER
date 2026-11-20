@@ -77,6 +77,24 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaises(ValidationError): self.manager.delete_user(self.user)
         self.assertEqual(before, self.store.path.read_bytes())
 
+    def test_failed_hopping_hook_restarts_with_restored_ranges(self):
+        from sbmanager.core.port_hopping import hopping_rules
+        from unittest.mock import patch
+        iid = self.manager.add_inbound('hy', 'hysteria2')
+        self.store.update(lambda state: state['inbounds'][iid].update(settings={
+            'port': 443, 'public_host': 'example.com', 'server_name': 'example.com', 'hop_range': '20000-30000'}))
+        self.activate()
+        seen = []
+
+        def restart():
+            seen.append(hopping_rules(json.loads(self.store.path.read_text())))
+            if len(seen) == 1:
+                raise RuntimeError('ExecStartPre failed')
+
+        with patch.object(self.service, 'restart', side_effect=restart), self.assertRaises(ValidationError):
+            self.store.update(lambda state: state['inbounds'][iid]['settings'].update(hop_range='40000-50000'))
+        self.assertEqual([[(40000, 50000, 443)], [(20000, 30000, 443)]], seen)
+
     def test_failed_first_deployment_restores_undeployed_state(self):
         before = self.store.path.read_bytes()
         self.service.fail_once = True

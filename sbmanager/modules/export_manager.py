@@ -41,6 +41,11 @@ def export_user(state, user_id, inbound_id=None):
         outbounds.append(node)
         address = f'[{host}]' if ':' in host else host
         path = '/' if protocol == 'anytls' else ''
+        if protocol == 'hysteria2' and 'hop_range' in settings:
+            port = settings['hop_range']
+            del node['server_port']
+            node['server_ports'] = [port.replace('-', ':')]
+            path = '/'
         links.append(f'{scheme}://{quote(secret, safe="")}@{address}:{port}{path}?{urlencode(params)}#{quote(inbound["name"], safe="")}')
     if not outbounds:
         raise ValidationError('这个用户还不能使用任何节点。请先到“用户管理 > 开通节点”授权，再查看节点分享链接')

@@ -13,7 +13,9 @@ def validate_state(state):
         if not isinstance(state.get(name), dict):
             raise ValidationError(f'保存的数据格式不正确（字段 {name}）。请保留原文件，使用有效备份恢复，不要手动删除数据')
     from sbmanager.core.forwarding import validate_forwards
+    from sbmanager.core.port_hopping import hopping_rules
     try:
+        hopping_rules(state)
         validate_forwards(state)
         names = set()
         for key, user in state['users'].items():
