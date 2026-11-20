@@ -16,7 +16,7 @@ from sbmanager.security import PortInUse
 from sbmanager.system.network import check_available
 from sbmanager.egress.registry import driver
 from sbmanager.egress.links import parse_link
-from sbmanager.system import bbr
+from sbmanager.system import bbr, reality_neighbors
 
 
 STYLES = {
@@ -282,6 +282,29 @@ def node_field(label, default=''):
     return value or default
 
 
+def reality_target(public_host, previous):
+    current = previous.get('server_name') or previous.get('handshake', '')
+    print('1) 手动输入目标域名（也可直接输入域名）\n2) 按节点入口推荐目标域名')
+    value = node_field('REALITY 目标网站域名', current)
+    if value == '2':
+        ips = reality_neighbors.addresses(public_host) if public_host else []
+        if ips:
+            entry = ips[0] if len(ips) == 1 else choose('选择节点入口 IPv4', [(ip, str(ip)) for ip in ips])
+            message(f'正在查询 {entry} 的邻居并验证握手，请稍候。', tone='info')
+            rows, notes = reality_neighbors.recommend(entry, ips, previous.get('handshake_port', 443))
+            for note in notes:
+                message(note, tone='warning')
+            if rows:
+                selected = choose('选择 REALITY 握手目标', rows + [(None, '改为手动输入')])
+                if selected is not None:
+                    return selected
+        else:
+            message('入口没有可用的公网 IPv4，请手动输入目标域名。', tone='warning')
+    elif value not in ('1', ''):
+        return value
+    return node_field('输入目标域名', current)
+
+
 def edit_node(manager, engine, adding=False):
     nodes = manager.store.read()['inbounds']
     iid = None if adding else select_record(nodes, '选择节点', 'inbounds')
@@ -305,7 +328,7 @@ def edit_node(manager, engine, adding=False):
     values = {**previous, **ask_inbound_ports(node_field, protocol, previous),
               'public_host': node_field('公网 IP 或域名', previous.get('public_host', ''))}
     if protocol == 'reality':
-        target = node_field('REALITY 目标网站域名', previous.get('server_name') or previous.get('handshake', ''))
+        target = reality_target(values['public_host'], previous)
         values['handshake'] = values['server_name'] = target
     else:
         values['server_name'] = node_field('证书域名', previous.get('server_name', values['public_host']))
