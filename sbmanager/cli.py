@@ -16,7 +16,7 @@ from sbmanager.security import PortInUse
 from sbmanager.system.network import check_available
 from sbmanager.egress.registry import driver
 from sbmanager.egress.links import parse_link
-from sbmanager.system import bbr, reality_neighbors
+from sbmanager.system import bbr, network, reality_neighbors
 
 
 STYLES = {
@@ -327,8 +327,13 @@ def edit_node(manager, engine, adding=False):
         protocol = inbound['protocol']
         print('协议：' + PROTOCOL_LABELS[protocol] + '（不可修改）')
     previous = inbound.get('settings', {}) if protocol == inbound.get('protocol') else {}
-    values = {**previous, **ask_inbound_ports(node_field, protocol, previous),
-              'public_host': node_field('公网 IP 或域名', previous.get('public_host', ''))}
+    values = {**previous, **ask_inbound_ports(node_field, protocol, previous)}
+    default_host = previous.get('public_host', '')
+    if adding:
+        message('正在检测服务器公网 IP…', tone='info')
+        addresses = network.public_addresses()
+        default_host = addresses.get('ipv4') or addresses.get('ipv6', '')
+    values['public_host'] = node_field('公网 IP 或域名', default_host)
     if protocol == 'reality':
         target = reality_target(values['public_host'], previous)
         values['handshake'] = values['server_name'] = target

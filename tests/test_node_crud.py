@@ -18,6 +18,9 @@ class NodeCrudTests(unittest.TestCase):
         self.manager = Manager(self.store)
         self.engine = Mock()
         self.engine.keypair.return_value = ('private', 'public')
+        addresses = patch('sbmanager.system.network.public_addresses', return_value={})
+        self.addresses = addresses.start()
+        self.addCleanup(addresses.stop)
 
     def action(self, number, answers):
         output = io.StringIO()
@@ -65,11 +68,36 @@ class NodeCrudTests(unittest.TestCase):
         iid, node = next(iter(self.store.read()['inbounds'].items()))
         self.assertEqual('Hysteria2', node['name'])
         self.assertEqual(443, node['settings']['port'])
+        self.addresses.reset_mock()
+        self.addresses.return_value = {'ipv4': '8.8.4.4'}
         self.action(3, ['1', '', '', '', ''])
+        self.addresses.assert_not_called()
         self.assertEqual(node, self.store.read()['inbounds'][iid])
         self.action(2, ['2', '', '8443', 'other.example', '', ''])
         self.assertEqual(['Hysteria2', 'Hysteria2 2'],
                          [n['name'] for n in self.store.read()['inbounds'].values()])
+
+    def test_add_defaults_to_public_ip_and_accepts_manual_entry(self):
+        ipv4, ipv6 = '8.8.4.4', '2001:4860:4860::8844'
+        dual_stack = {'ipv4': ipv4, 'ipv6': ipv6}
+        cases = (
+            (dual_stack, '', ipv4, ipv4),
+            ({'ipv6': ipv6}, '', ipv6, ipv6),
+            (dual_stack, 'custom.example', ipv4, 'custom.example'),
+            ({}, 'manual.example', '', 'manual.example'),
+        )
+        for port, (addresses, answer, default, expected) in enumerate(cases, 8443):
+            with self.subTest(addresses=addresses, answer=answer):
+                self.addresses.return_value = addresses
+                answers = ['2', '', str(port), answer, 'cert.example', '']
+                with patch('builtins.input', side_effect=answers) as reader, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    node_action(2, self.manager, self.engine)
+                expected_prompt = '公网 IP 或域名' + (f' [{default}]' if default else '')
+                self.assertEqual(expected_prompt, reader.call_args_list[3].args[0].splitlines()[0])
+                node = next(node for node in self.store.read()['inbounds'].values()
+                            if node['settings']['port'] == port)
+                self.assertEqual(expected, node['settings']['public_host'])
 
     def test_cancel_and_invalid_add_leave_no_partial_node(self):
         for answers in (['2', '0'], ['2', '', '0'], ['2', '', '', '0']):
